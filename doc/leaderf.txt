@@ -1126,6 +1126,18 @@ g:Lf_EnableCircularScroll                     *g:Lf_EnableCircularScroll*
 
     Default value is 0.
 
+g:Lf_GitCommands                              *g:Lf_GitCommands*
+    Define a list of commands you may want to use frequently.
+    The list is as follows: >
+    let g:Lf_GitCommands = [
+                    \ {"Leaderf git diff":                       "fuzzy search and view the diffs"},
+                    \ {"Leaderf git diff --cached":              "fuzzy search and view `git diff --cached`"},
+                    \ {"Leaderf git diff HEAD":                  "fuzzy search and view `git diff HEAD`"},
+                    \ {"Leaderf git diff --side-by-side":        "fuzzy search and view the side-by-side diffs"},
+                    \ ]
+<
+    Open the commands panel using `:Leaderf git` .
+
 ==============================================================================
 USAGE                                           *leaderf-usage*
 
