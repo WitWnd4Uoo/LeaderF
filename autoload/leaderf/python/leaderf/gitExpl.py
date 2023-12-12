@@ -474,6 +474,8 @@ class TreeView(GitCommandView):
         super(TreeView, self).__init__(owner, cmd, window_id)
         # key is the parent hash, value is a TreeNode
         self._trees = {}
+        self._short_stat = {}
+        self._num_stat = {}
 
     def getSource(self, line):
         """
@@ -512,17 +514,34 @@ class TreeView(GitCommandView):
             if line.startswith("#"):
                 size = len(self._trees)
                 first_tree_node = TreeNode()
-                self._trees[line.split()[size + 1]] = first_tree_node
+                parent = line.split()[size + 1]
+                self._trees[parent] = first_tree_node
             elif line.startswith(":"):
                 source = self.getSource(line)
                 file_path = source[4] if source[4] != "" else source[3]
                 tree_node = first_tree_node
-                for *dirs, file in file_path.split(os.sep):
-                    for d in dirs:
-                        if d not in tree_node.dirs:
-                            tree_node.dirs[d] = TreeNode()
-                        tree_node = tree_node.dirs[d]
-                    tree_node.files[file] = source
+                *dirs, file = file_path.split(os.sep)
+                for d in dirs:
+                    if d not in tree_node.dirs:
+                        tree_node.dirs[d] = TreeNode()
+                    tree_node = tree_node.dirs[d]
+                tree_node.files[file] = source
+            elif line.startswith(" "):
+                self._short_stat[parent] = line
+            elif line == "":
+                continue
+            else:
+                if parent not in self._num_stat:
+                    self._num_stat[parent] = {}
+
+                #'3\t1\tarch/{i386 => x86}/Makefile'
+                added, deleted, pathname = line.split("\t")
+                if "=>" in pathname:
+                    if "{" in pathname:
+                        pathname = re.sub(r'{.*?=> (.*?)}', r'\1', pathname)
+                    else:
+                        pathname = pathname.split(" => ")[1]
+                self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
 
 
     def writeBuffer(self):
