@@ -473,7 +473,7 @@ class TreeView(GitCommandView):
     def __init__(self, owner, cmd, window_id):
         super(TreeView, self).__init__(owner, cmd, window_id)
         # key is the parent hash, value is a TreeNode
-        self._trees = {}
+        self._trees = OrderedDict()
         self._short_stat = {}
         self._num_stat = {}
 
@@ -527,10 +527,11 @@ class TreeView(GitCommandView):
                     tree_node = tree_node.dirs[d]
                 tree_node.files[file] = source
             elif line.startswith(" "):
-                self._short_stat[parent] = line
+                self._short_stat[list(self._trees.keys())[-1]] = line
             elif line == "":
                 continue
             else:
+                parent = list(self._trees.keys())[-1]
                 if parent not in self._num_stat:
                     self._num_stat[parent] = {}
 
