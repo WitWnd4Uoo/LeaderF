@@ -509,22 +509,18 @@ class TreeView(GitCommandView):
         3       0       src/a.txt
          1 file changed, 3 insertions(+)
         """
-        first_tree_node = None
         for line in cmd_outputs:
             if line.startswith("#"):
                 size = len(self._trees)
-                first_tree_node = TreeNode()
                 parent = line.split()[size + 1]
-                self._trees[parent] = first_tree_node
+                self._trees[parent] = TreeNode()
             elif line.startswith(":"):
                 source = self.getSource(line)
                 file_path = source[4] if source[4] != "" else source[3]
-                tree_node = first_tree_node
+                tree_node = list(self._trees.values())[-1]
                 *dirs, file = file_path.split(os.sep)
                 for d in dirs:
-                    if d not in tree_node.dirs:
-                        tree_node.dirs[d] = TreeNode()
-                    tree_node = tree_node.dirs[d]
+                    tree_node = tree_node.dirs.setdefault(d, TreeNode())
                 tree_node.files[file] = source
             elif line.startswith(" "):
                 self._short_stat[list(self._trees.keys())[-1]] = line
@@ -543,7 +539,6 @@ class TreeView(GitCommandView):
                     else:
                         pathname = pathname.split(" => ")[1]
                 self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
-
 
     def writeBuffer(self):
         if self._read_finished == 2:
