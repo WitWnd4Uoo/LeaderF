@@ -512,7 +512,11 @@ class TreeView(GitCommandView):
         for line in cmd_outputs:
             if line.startswith("#"):
                 size = len(self._trees)
-                parent = line.split()[size + 1]
+                parents = line.split()
+                if len(parents) == 1: # first commit
+                    parent = "0000000"
+                else:
+                    parent = parents[size + 1]
                 self._trees[parent] = TreeNode()
             elif line.startswith(":"):
                 source = self.getSource(line)
