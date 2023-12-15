@@ -574,8 +574,8 @@ class TreeView(GitCommandView):
     def _readContent(self, content):
         try:
             for line in content:
-                self._content.append(line)
                 self.buildTree(line)
+                self._content.append(line)
                 if self._stop_reader_thread:
                     break
             else:
