@@ -461,7 +461,8 @@ class GitCommandView(object):
         return self._buffer is not None and self._buffer.valid
 
 class TreeNode(object):
-    def __init__(self):
+    def __init__(self, level):
+        self.level = 0
         # key is the directory name, value is a TreeNode
         self.dirs = OrderedDict()
         # key is the file name,
@@ -495,7 +496,7 @@ class TreeView(GitCommandView):
         return (blob_status[2], blob_status[3], blob_status[4],
                 file_names[0], file_names[1])
 
-    def buildTree(self, cmd_outputs):
+    def buildTree(self, line):
         """
         cmd_outputs is something as follows:
 
@@ -509,40 +510,39 @@ class TreeView(GitCommandView):
         3       0       src/a.txt
          1 file changed, 3 insertions(+)
         """
-        for line in cmd_outputs:
-            if line.startswith("#"):
-                size = len(self._trees)
-                parents = line.split()
-                if len(parents) == 1: # first commit
-                    parent = "0000000"
-                else:
-                    parent = parents[size + 1]
-                self._trees[parent] = TreeNode()
-            elif line.startswith(":"):
-                source = self.getSource(line)
-                file_path = source[4] if source[4] != "" else source[3]
-                tree_node = list(self._trees.values())[-1]
-                *dirs, file = file_path.split(os.sep)
-                for d in dirs:
-                    tree_node = tree_node.dirs.setdefault(d, TreeNode())
-                tree_node.files[file] = source
-            elif line.startswith(" "):
-                self._short_stat[list(self._trees.keys())[-1]] = line
-            elif line == "":
-                continue
+        if line.startswith("#"):
+            size = len(self._trees)
+            parents = line.split()
+            if len(parents) == 1: # first commit
+                parent = "0000000"
             else:
-                parent = list(self._trees.keys())[-1]
-                if parent not in self._num_stat:
-                    self._num_stat[parent] = {}
+                parent = parents[size + 1]
+            self._trees[parent] = TreeNode(0)
+        elif line.startswith(":"):
+            source = self.getSource(line)
+            file_path = source[4] if source[4] != "" else source[3]
+            tree_node = list(self._trees.values())[-1]
+            *dirs, file = file_path.split(os.sep)
+            for i, d in enumerate(dirs, 1):
+                tree_node = tree_node.dirs.setdefault(d, TreeNode(i))
+            tree_node.files[file] = source
+        elif line.startswith(" "):
+            self._short_stat[list(self._trees.keys())[-1]] = line
+        elif line == "":
+            pass
+        else:
+            parent = list(self._trees.keys())[-1]
+            if parent not in self._num_stat:
+                self._num_stat[parent] = {}
 
-                #'3\t1\tarch/{i386 => x86}/Makefile'
-                added, deleted, pathname = line.split("\t")
-                if "=>" in pathname:
-                    if "{" in pathname:
-                        pathname = re.sub(r'{.*?=> (.*?)}', r'\1', pathname)
-                    else:
-                        pathname = pathname.split(" => ")[1]
-                self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
+            #'3\t1\tarch/{i386 => x86}/Makefile'
+            added, deleted, pathname = line.split("\t")
+            if "=>" in pathname:
+                if "{" in pathname:
+                    pathname = re.sub(r'{.*?=> (.*?)}', r'\1', pathname)
+                else:
+                    pathname = pathname.split(" => ")[1]
+            self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
 
     def writeBuffer(self):
         if self._read_finished == 2:
@@ -575,6 +575,7 @@ class TreeView(GitCommandView):
         try:
             for line in content:
                 self._content.append(line)
+                self.buildTree(line)
                 if self._stop_reader_thread:
                     break
             else:
