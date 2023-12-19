@@ -7,6 +7,7 @@ import os
 import os.path
 import json
 import itertools
+from enum import Enum
 from functools import wraps
 from collections import OrderedDict
 from .utils import *
@@ -461,9 +462,16 @@ class GitCommandView(object):
     def valid(self):
         return self._buffer is not None and self._buffer.valid
 
+
+class FolderStatus(Enum):
+    OPEN = 0
+    CLOSED = 1
+
+
 class TreeNode(object):
     def __init__(self, level):
         self.level = 0
+        self.status = FolderStatus.CLOSED
         # key is the directory name, value is a TreeNode
         self.dirs = OrderedDict()
         # key is the file name,
@@ -471,13 +479,23 @@ class TreeNode(object):
         self.files = OrderedDict()
 
 
+class MetaInfo(object):
+    def __init__(self, level, is_dir, name, info):
+        """
+        info is TreeNode if is_dir is true or source otherwise.
+        """
+        self.level = level
+        self.is_dir = is_dir
+        self.name = name
+        self.info = info
+
+
 class TreeView(GitCommandView):
     def __init__(self, owner, cmd, window_id):
         super(TreeView, self).__init__(owner, cmd, window_id)
         # key is the parent hash, value is a TreeNode
         self._trees = OrderedDict()
-        # key is the parent hash, value is a list of [level, is_dir, is_open, (dir_name, TreeNode)]
-        # or [level, is_dir, is_open, (file_name, source)]
+        # key is the parent hash, value is a list of MetaInfo
         self._mirror = {}
         # key is the parent hash
         self._mirror_generator = {}
@@ -555,24 +573,30 @@ class TreeView(GitCommandView):
 
     def mirrorGenerator(self, node):
         """
-        yield [level, is_dir, is_open, (dir_name, TreeNode)]
-        or
-        yield [level, is_dir, is_open, (file_name, source)]
+        yield MetaInfo
         """
         n = node.level
-        for item in node.dirs.items():
-            yield [n, True, True, item]
-            yield from self.mirrorGenerator(item[1])
-        for item in node.files.items():
-            yield [n, False, True, item]
+        for k, v in node.dirs.items():
+            yield MetaInfo(n, True, k, v)
+            yield from self.mirrorGenerator(v)
+        for k, v in node.files.items():
+            yield MetaInfo(n, False, k, v)
 
     def buildMirror(self, count):
         if self._current_parent not in self._mirror_generator:
             self._mirror_generator[self._current_parent] = self.mirrorGenerator(self._trees[self._current_parent])
 
         self._mirror[self._current_parent].extend(
-                itertools.islice(self._mirror_generator[self._current_parent], count)
-                )
+                itertools.islice(self._mirror_generator[self._current_parent], count))
+
+    def buildLine(self, info):
+        """
+        info is MetaInfo
+        """
+        if info.is_dir:
+            return "{}{}/".format("  " * info.level, info.name)
+        else:
+            return "{}{}".format("  " * info.level, info.name)
 
     def writeBuffer(self):
         if self._read_finished == 2:
@@ -585,14 +609,20 @@ class TreeView(GitCommandView):
         self._buffer.options['modifiable'] = True
         try:
             cur_len = len(self._content)
-            if cur_len > self._offset_in_content:
+            count = cur_len - self._offset_in_content
+            if count > 0:
+                self.buildMirror(count)
+
                 if self._offset_in_content == 0:
-                    self._buffer[:] = self._content[:cur_len]
+                    self._buffer[:] = [self.buildLine(info)
+                                       for info in self._mirror[self._current_parent][:cur_len]]
                 else:
-                    self._buffer.append(self._content[self._offset_in_content:cur_len])
+                    self._buffer.append([self.buildLine(info)
+                                         for info in self._mirror[self._current_parent]
+                                         [self._offset_in_content:cur_len]])
 
                 self._offset_in_content = cur_len
-                lfCmd("redraw")
+                # lfCmd("redraw")
         finally:
             self._buffer.options['modifiable'] = False
 
