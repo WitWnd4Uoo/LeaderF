@@ -6,6 +6,7 @@ import re
 import os
 import os.path
 import json
+import itertools
 from functools import wraps
 from collections import OrderedDict
 from .utils import *
@@ -475,6 +476,12 @@ class TreeView(GitCommandView):
         super(TreeView, self).__init__(owner, cmd, window_id)
         # key is the parent hash, value is a TreeNode
         self._trees = OrderedDict()
+        # key is the parent hash, value is a list of [level, is_dir, is_open, (dir_name, TreeNode)]
+        # or [level, is_dir, is_open, (file_name, source)]
+        self._mirror = {}
+        # key is the parent hash
+        self._mirror_generator = {}
+        self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
 
@@ -517,6 +524,8 @@ class TreeView(GitCommandView):
                 parent = "0000000"
             else:
                 parent = parents[size + 1]
+            if self._current_parent is None:
+                self._current_parent = parent
             self._trees[parent] = TreeNode(0)
         elif line.startswith(":"):
             source = self.getSource(line)
@@ -543,6 +552,27 @@ class TreeView(GitCommandView):
                 else:
                     pathname = pathname.split(" => ")[1]
             self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
+
+    def mirrorGenerator(self, node):
+        """
+        yield [level, is_dir, is_open, (dir_name, TreeNode)]
+        or
+        yield [level, is_dir, is_open, (file_name, source)]
+        """
+        n = node.level
+        for item in node.dirs.items():
+            yield [n, True, True, item]
+            yield from self.mirrorGenerator(item[1])
+        for item in node.files.items():
+            yield [n, False, True, item]
+
+    def buildMirror(self, count):
+        if self._current_parent not in self._mirror_generator:
+            self._mirror_generator[self._current_parent] = self.mirrorGenerator(self._trees[self._current_parent])
+
+        self._mirror[self._current_parent].extend(
+                itertools.islice(self._mirror_generator[self._current_parent], count)
+                )
 
     def writeBuffer(self):
         if self._read_finished == 2:
