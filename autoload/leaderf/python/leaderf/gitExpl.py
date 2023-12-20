@@ -10,6 +10,7 @@ import itertools
 from enum import Enum
 from functools import wraps
 from collections import OrderedDict
+from collections import UserDict
 from .utils import *
 from .explorer import *
 from .manager import *
@@ -461,6 +462,116 @@ class GitCommandView(object):
 
     def valid(self):
         return self._buffer is not None and self._buffer.valid
+
+
+class LfOrderedDict(UserDict):
+    def __init__(*args, **kwargs):
+        if not args:
+            raise TypeError("descriptor '__init__' of 'UserDict' object "
+                            "needs an argument")
+        self = args[0]
+        args = args[1:]
+        if len(args) > 1:
+            raise TypeError('expected at most 1 arguments, got %d' % len(args))
+        if args:
+            dict = args[0]
+        elif 'dict' in kwargs:
+            dict = kwargs.pop('dict')
+            import warnings
+            warnings.warn("Passing 'dict' as keyword argument is "
+                          "deprecated", PendingDeprecationWarning,
+                          stacklevel=2)
+        else:
+            dict = None
+        self.data = {}
+        if dict is not None:
+            self.update(dict)
+        if len(kwargs):
+            self.update(kwargs)
+    def __repr__(self): return repr(self.data)
+    def __cmp__(self, dict):
+        if isinstance(dict, UserDict):
+            return cmp(self.data, dict.data)
+        else:
+            return cmp(self.data, dict)
+    __hash__ = None # Avoid Py3k warning
+    def __len__(self): return len(self.data)
+    def __getitem__(self, key):
+        if key in self.data:
+            return self.data[key]
+        if hasattr(self.__class__, "__missing__"):
+            return self.__class__.__missing__(self, key)
+        raise KeyError(key)
+    def __setitem__(self, key, item): self.data[key] = item
+    def __delitem__(self, key): del self.data[key]
+    def clear(self): self.data.clear()
+    def copy(self):
+        if self.__class__ is UserDict:
+            return UserDict(self.data.copy())
+        import copy
+        data = self.data
+        try:
+            self.data = {}
+            c = copy.copy(self)
+        finally:
+            self.data = data
+        c.update(self)
+        return c
+    def keys(self): return self.data.keys()
+    def items(self): return self.data.items()
+    def iteritems(self): return self.data.iteritems()
+    def iterkeys(self): return self.data.iterkeys()
+    def itervalues(self): return self.data.itervalues()
+    def values(self): return self.data.values()
+    def has_key(self, key): return key in self.data
+    def update(*args, **kwargs):
+        if not args:
+            raise TypeError("descriptor 'update' of 'UserDict' object "
+                            "needs an argument")
+        self = args[0]
+        args = args[1:]
+        if len(args) > 1:
+            raise TypeError('expected at most 1 arguments, got %d' % len(args))
+        if args:
+            dict = args[0]
+        elif 'dict' in kwargs:
+            dict = kwargs.pop('dict')
+            import warnings
+            warnings.warn("Passing 'dict' as keyword argument is deprecated",
+                          PendingDeprecationWarning, stacklevel=2)
+        else:
+            dict = None
+        if dict is None:
+            pass
+        elif isinstance(dict, UserDict):
+            self.data.update(dict.data)
+        elif isinstance(dict, type({})) or not hasattr(dict, 'items'):
+            self.data.update(dict)
+        else:
+            for k, v in dict.items():
+                self[k] = v
+        if len(kwargs):
+            self.data.update(kwargs)
+    def get(self, key, failobj=None):
+        if key not in self:
+            return failobj
+        return self[key]
+    def setdefault(self, key, failobj=None):
+        if key not in self:
+            self[key] = failobj
+        return self[key]
+    def pop(self, key, *args):
+        return self.data.pop(key, *args)
+    def popitem(self):
+        return self.data.popitem()
+    def __contains__(self, key):
+        return key in self.data
+    @classmethod
+    def fromkeys(cls, iterable, value=None):
+        d = cls()
+        for key in iterable:
+            d[key] = value
+        return d
 
 
 class FolderStatus(Enum):
