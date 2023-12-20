@@ -470,7 +470,7 @@ class FolderStatus(Enum):
 
 class TreeNode(object):
     def __init__(self, level):
-        self.level = 0
+        self.level = level
         self.status = FolderStatus.CLOSED
         # key is the directory name, value is a TreeNode
         self.dirs = OrderedDict()
@@ -502,8 +502,10 @@ class TreeView(GitCommandView):
         self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
+        self._file_num = {}
+        self._offset_in_mirror = 0
 
-    def getSource(self, line):
+    def generateSource(self, line):
         """
         :000000 100644 000000000 5b01d33aa A    runtime/syntax/json5.vim
         :100644 100644 671b269c0 ef52cddf4 M    runtime/syntax/nix.vim
@@ -545,14 +547,16 @@ class TreeView(GitCommandView):
             if self._current_parent is None:
                 self._current_parent = parent
             self._trees[parent] = TreeNode(0)
+            self._file_num[parent] = 0
         elif line.startswith(":"):
-            source = self.getSource(line)
+            source = self.generateSource(line)
             file_path = source[4] if source[4] != "" else source[3]
             tree_node = list(self._trees.values())[-1]
             *dirs, file = file_path.split(os.sep)
             for i, d in enumerate(dirs, 1):
                 tree_node = tree_node.dirs.setdefault(d, TreeNode(i))
             tree_node.files[file] = source
+            self._file_num[self._current_parent] += 1
         elif line.startswith(" "):
             self._short_stat[list(self._trees.keys())[-1]] = line
         elif line == "":
@@ -585,9 +589,13 @@ class TreeView(GitCommandView):
     def buildMirror(self, count):
         if self._current_parent not in self._mirror_generator:
             self._mirror_generator[self._current_parent] = self.mirrorGenerator(self._trees[self._current_parent])
+            self._mirror[self._current_parent] = []
 
-        self._mirror[self._current_parent].extend(
-                itertools.islice(self._mirror_generator[self._current_parent], count))
+        while count > 0:
+            info = next(self._mirror_generator[self._current_parent])
+            self._mirror[self._current_parent].append(info)
+            if info.is_dir == False:
+                count -= 1
 
     def buildLine(self, info):
         """
@@ -599,6 +607,9 @@ class TreeView(GitCommandView):
             return "{}{}".format("  " * info.level, info.name)
 
     def writeBuffer(self):
+        if self._current_parent is None:
+            return
+
         if self._read_finished == 2:
             return
 
@@ -608,25 +619,25 @@ class TreeView(GitCommandView):
 
         self._buffer.options['modifiable'] = True
         try:
-            cur_len = len(self._content)
+            cur_len = self._file_num[self._current_parent]
             count = cur_len - self._offset_in_content
             if count > 0:
                 self.buildMirror(count)
+                mirror = self._mirror[self._current_parent]
 
                 if self._offset_in_content == 0:
-                    self._buffer[:] = [self.buildLine(info)
-                                       for info in self._mirror[self._current_parent][:cur_len]]
+                    self._buffer[:] = [self.buildLine(info) for info in mirror]
                 else:
                     self._buffer.append([self.buildLine(info)
-                                         for info in self._mirror[self._current_parent]
-                                         [self._offset_in_content:cur_len]])
+                                         for info in mirror[self._offset_in_mirror:]])
 
                 self._offset_in_content = cur_len
+                self._offset_in_mirror = len(mirror)
                 # lfCmd("redraw")
         finally:
             self._buffer.options['modifiable'] = False
 
-        if self._read_finished == 1 and self._offset_in_content == len(self._content):
+        if self._read_finished == 1 and self._offset_in_content == self._file_num[self._current_parent]:
             self._read_finished = 2
             self._owner.writeFinished(self._window_id)
             self.stopTimer()
@@ -635,7 +646,6 @@ class TreeView(GitCommandView):
         try:
             for line in content:
                 self.buildTree(line)
-                self._content.append(line)
                 if self._stop_reader_thread:
                     break
             else:
@@ -852,7 +862,48 @@ class SplitDiffPanel(Panel):
 
 class NavigationPanel(Panel):
     def __init__(self):
-        pass
+        self._views = {}
+        self._sources = set()
+
+    def register(self, view):
+        self._views[view.getBufferName()] = view
+        self._sources.add(view.getSource())
+
+    def deregister(self, view):
+        name = view.getBufferName()
+        if name in self._views:
+            self._sources.discard(self._views[name].getSource())
+            self._views[name].cleanup()
+            del self._views[name]
+
+    def getSources(self):
+        return self._sources
+
+    def _createWindow(self, win_pos, buffer_name):
+        if win_pos == 'top':
+            lfCmd("silent! noa keepa keepj abo sp {}".format(buffer_name))
+        elif win_pos == 'bottom':
+            lfCmd("silent! noa keepa keepj bel sp {}".format(buffer_name))
+        elif win_pos == 'left':
+            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
+        elif win_pos == 'right':
+            lfCmd("silent! noa keepa keepj bel vsp {}".format(buffer_name))
+        else:
+            lfCmd("silent! keepa keepj hide edit {}".format(buffer_name))
+
+        return int(lfEval("win_getid()"))
+
+    def create(self, cmd, content=None):
+        buffer_name = cmd.getBufferName()
+        if buffer_name in self._views and self._views[buffer_name].valid():
+            self._views[buffer_name].create(buf_content=content)
+        else:
+            winid = self._createWindow(cmd.getArguments().get("--position", [""])[0], buffer_name)
+            TreeView(self, cmd, winid).create(buf_content=content)
+
+    def writeBuffer(self):
+        for v in self._views.values():
+            v.writeBuffer()
 
 
 class DiffViewPanel(Panel):
@@ -1225,6 +1276,7 @@ class GitLogExplManager(GitExplManager):
     def _accept(self, file, mode, *args, **kwargs):
         if "--explorer" in self._arguments:
             pass
+            super(GitExplManager, self)._accept(file, mode, *args, **kwargs)
         else:
             super(GitExplManager, self)._accept(file, mode, *args, **kwargs)
 
@@ -1237,6 +1289,15 @@ class GitLogExplManager(GitExplManager):
 
         if "--explorer" in self._arguments:
             pass
+            if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
+                lfCmd("tabnew")
+
+            tabpage_count = len(vim.tabpages)
+
+            NavigationPanel().create(GitLogExplCommand(self._arguments, source), None)
+
+            if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
+                tabmove()
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
                 lfCmd("tabnew")
