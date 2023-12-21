@@ -10,7 +10,6 @@ import itertools
 from enum import Enum
 from functools import wraps
 from collections import OrderedDict
-from collections import UserDict
 from .utils import *
 from .explorer import *
 from .manager import *
@@ -464,108 +463,75 @@ class GitCommandView(object):
         return self._buffer is not None and self._buffer.valid
 
 
-class LfOrderedDict(UserDict):
-    def __init__(*args, **kwargs):
-        if not args:
-            raise TypeError("descriptor '__init__' of 'UserDict' object "
-                            "needs an argument")
-        self = args[0]
-        args = args[1:]
-        if len(args) > 1:
-            raise TypeError('expected at most 1 arguments, got %d' % len(args))
-        if args:
-            dict = args[0]
-        elif 'dict' in kwargs:
-            dict = kwargs.pop('dict')
-            import warnings
-            warnings.warn("Passing 'dict' as keyword argument is "
-                          "deprecated", PendingDeprecationWarning,
-                          stacklevel=2)
-        else:
-            dict = None
-        self.data = {}
-        if dict is not None:
-            self.update(dict)
-        if len(kwargs):
-            self.update(kwargs)
-    def __repr__(self): return repr(self.data)
-    def __cmp__(self, dict):
-        if isinstance(dict, UserDict):
-            return cmp(self.data, dict.data)
-        else:
-            return cmp(self.data, dict)
-    __hash__ = None # Avoid Py3k warning
-    def __len__(self): return len(self.data)
+class LfOrderedDict(object):
+    def __init__(self):
+        # { k : ([k, v], index) }
+        self._dict = {}
+        # a list of ([k, v], index)
+        self._list = []
+
+    def __repr__(self):
+        return repr(self._dict)
+
+    def __str__(self):
+        return str(self._dict)
+
+    def __len__(self):
+        return len(self._dict)
+
     def __getitem__(self, key):
-        if key in self.data:
-            return self.data[key]
+        if key in self._dict:
+            return self._dict[key][0][1]
         if hasattr(self.__class__, "__missing__"):
             return self.__class__.__missing__(self, key)
         raise KeyError(key)
-    def __setitem__(self, key, item): self.data[key] = item
-    def __delitem__(self, key): del self.data[key]
-    def clear(self): self.data.clear()
-    def copy(self):
-        if self.__class__ is UserDict:
-            return UserDict(self.data.copy())
-        import copy
-        data = self.data
-        try:
-            self.data = {}
-            c = copy.copy(self)
-        finally:
-            self.data = data
-        c.update(self)
-        return c
-    def keys(self): return self.data.keys()
-    def items(self): return self.data.items()
-    def iteritems(self): return self.data.iteritems()
-    def iterkeys(self): return self.data.iterkeys()
-    def itervalues(self): return self.data.itervalues()
-    def values(self): return self.data.values()
-    def has_key(self, key): return key in self.data
-    def update(*args, **kwargs):
-        if not args:
-            raise TypeError("descriptor 'update' of 'UserDict' object "
-                            "needs an argument")
-        self = args[0]
-        args = args[1:]
-        if len(args) > 1:
-            raise TypeError('expected at most 1 arguments, got %d' % len(args))
-        if args:
-            dict = args[0]
-        elif 'dict' in kwargs:
-            dict = kwargs.pop('dict')
-            import warnings
-            warnings.warn("Passing 'dict' as keyword argument is deprecated",
-                          PendingDeprecationWarning, stacklevel=2)
+
+    def __setitem__(self, key, item):
+        if key in self._dict:
+            self._dict[key][0][1] = item
         else:
-            dict = None
-        if dict is None:
-            pass
-        elif isinstance(dict, UserDict):
-            self.data.update(dict.data)
-        elif isinstance(dict, type({})) or not hasattr(dict, 'items'):
-            self.data.update(dict)
-        else:
-            for k, v in dict.items():
-                self[k] = v
-        if len(kwargs):
-            self.data.update(kwargs)
+            self._list.append(([key, item], len(self._list)))
+            self._dict[key] = self._list[-1]
+
+    def __iter__(self):
+        return iter(self._dict.keys())
+
+    def clear(self):
+        self._dict.clear()
+        self._list.clear()
+
+    def keys(self):
+        return self._dict.keys()
+
+    def items(self):
+        return (i[0] for i in self._list)
+
+    def values(self):
+        return (i[0][1] for i in self._list)
+
+    def has_key(self, key):
+        return key in self._dict
+
     def get(self, key, failobj=None):
         if key not in self:
             return failobj
         return self[key]
+
     def setdefault(self, key, failobj=None):
         if key not in self:
             self[key] = failobj
         return self[key]
-    def pop(self, key, *args):
-        return self.data.pop(key, *args)
-    def popitem(self):
-        return self.data.popitem()
+
     def __contains__(self, key):
-        return key in self.data
+        return key in self._dict
+
+    def itemsAfterKey(self, key):
+        if key not in self._dict:
+            index = len(self._list)
+        else:
+            index = self._dict[key][1]
+        return (self._list[i][0] for i in range(index+1, len(self._list)))
+
     @classmethod
     def fromkeys(cls, iterable, value=None):
         d = cls()
