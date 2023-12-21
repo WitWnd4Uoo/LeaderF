@@ -573,14 +573,14 @@ class TreeView(GitCommandView):
         # key is the parent hash, value is a TreeNode
         self._trees = OrderedDict()
         # key is the parent hash, value is a list of MetaInfo
-        self._mirror = {}
+        self._view = {}
         # key is the parent hash
-        self._mirror_generator = {}
+        self._view_generator = {}
         self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
         self._file_num = {}
-        self._offset_in_mirror = 0
+        self._offset_in_view = 0
 
     def generateSource(self, line):
         """
@@ -652,25 +652,25 @@ class TreeView(GitCommandView):
                     pathname = pathname.split(" => ")[1]
             self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
 
-    def mirrorGenerator(self, node):
+    def viewGenerator(self, node):
         """
         yield MetaInfo
         """
         n = node.level
         for k, v in node.dirs.items():
             yield MetaInfo(n, True, k, v)
-            yield from self.mirrorGenerator(v)
+            yield from self.viewGenerator(v)
         for k, v in node.files.items():
             yield MetaInfo(n, False, k, v)
 
-    def buildMirror(self, count):
-        if self._current_parent not in self._mirror_generator:
-            self._mirror_generator[self._current_parent] = self.mirrorGenerator(self._trees[self._current_parent])
-            self._mirror[self._current_parent] = []
+    def buildView(self, count):
+        if self._current_parent not in self._view_generator:
+            self._view_generator[self._current_parent] = self.viewGenerator(self._trees[self._current_parent])
+            self._view[self._current_parent] = []
 
         while count > 0:
-            info = next(self._mirror_generator[self._current_parent])
-            self._mirror[self._current_parent].append(info)
+            info = next(self._view_generator[self._current_parent])
+            self._view[self._current_parent].append(info)
             if info.is_dir == False:
                 count -= 1
 
@@ -699,17 +699,17 @@ class TreeView(GitCommandView):
             cur_len = self._file_num[self._current_parent]
             count = cur_len - self._offset_in_content
             if count > 0:
-                self.buildMirror(count)
-                mirror = self._mirror[self._current_parent]
+                self.buildView(count)
+                view = self._view[self._current_parent]
 
                 if self._offset_in_content == 0:
-                    self._buffer[:] = [self.buildLine(info) for info in mirror]
+                    self._buffer[:] = [self.buildLine(info) for info in view]
                 else:
                     self._buffer.append([self.buildLine(info)
-                                         for info in mirror[self._offset_in_mirror:]])
+                                         for info in view[self._offset_in_view:]])
 
                 self._offset_in_content = cur_len
-                self._offset_in_mirror = len(mirror)
+                self._offset_in_view = len(view)
                 # lfCmd("redraw")
         finally:
             self._buffer.options['modifiable'] = False
