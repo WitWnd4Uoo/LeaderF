@@ -10,6 +10,7 @@ import itertools
 from enum import Enum
 from functools import wraps
 from collections import OrderedDict
+from collections import deque
 from .utils import *
 from .explorer import *
 from .manager import *
@@ -463,7 +464,7 @@ class GitCommandView(object):
         return self._buffer is not None and self._buffer.valid
 
 
-class LfOrderedDict(object):
+class LfOrderedDict1(object):
     def __init__(self):
         # { k : ([k, v], index) }
         self._dict = {}
@@ -540,6 +541,17 @@ class LfOrderedDict(object):
         return d
 
 
+class LfOrderedDict(OrderedDict):
+    def last_key(self):
+        return next(reversed(self.keys()))
+
+    def last_value(self):
+        return next(reversed(self.values()))
+
+    def last_key_value(self):
+        return next(reversed(self.items()))
+
+
 class FolderStatus(Enum):
     OPEN = 0
     CLOSED = 1
@@ -550,10 +562,10 @@ class TreeNode(object):
         self.level = level
         self.status = FolderStatus.CLOSED
         # key is the directory name, value is a TreeNode
-        self.dirs = OrderedDict()
+        self.dirs = LfOrderedDict()
         # key is the file name,
         # value is a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
-        self.files = OrderedDict()
+        self.files = LfOrderedDict()
 
 
 class MetaInfo(object):
@@ -571,15 +583,14 @@ class TreeView(GitCommandView):
     def __init__(self, owner, cmd, window_id):
         super(TreeView, self).__init__(owner, cmd, window_id)
         # key is the parent hash, value is a TreeNode
-        self._trees = OrderedDict()
+        self._trees = LfOrderedDict()
         # key is the parent hash, value is a list of MetaInfo
-        self._view = {}
+        self.file_structures = {}
         # key is the parent hash
         self._view_generator = {}
         self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
-        self._file_num = {}
         self._offset_in_view = 0
 
     def generateSource(self, line):
@@ -624,16 +635,36 @@ class TreeView(GitCommandView):
             if self._current_parent is None:
                 self._current_parent = parent
             self._trees[parent] = TreeNode(0)
-            self._file_num[parent] = 0
         elif line.startswith(":"):
             source = self.generateSource(line)
             file_path = source[4] if source[4] != "" else source[3]
-            tree_node = list(self._trees.values())[-1]
+            tree_node = self._trees.last_value()
             *dirs, file = file_path.split(os.sep)
             for i, d in enumerate(dirs, 1):
-                tree_node = tree_node.dirs.setdefault(d, TreeNode(i))
+                if d not in tree_node.dirs:
+                    dirs = tree_node.dirs
+                    stack = deque()
+                    while(len(dirs) > 0):
+                        last_node = dirs.last_value()
+                        stack.append(last_node)
+                        dirs = last_node.dirs
+
+                    while len(stack) > 0:
+                        node = stack.pop()
+                        for k, v in node.files.items():
+                            self.file_structures[self._current_parent].append(
+                                    MetaInfo(node.level, False, k, v)
+                                    )
+
+                    tree_node.dirs[d] = TreeNode(i)
+                    self.file_structures[self._current_parent].append(
+                            MetaInfo(i, True, d, tree_node.dirs[d])
+                            )
+
+                tree_node = tree_node.dirs[d]
+
+
             tree_node.files[file] = source
-            self._file_num[self._current_parent] += 1
         elif line.startswith(" "):
             self._short_stat[list(self._trees.keys())[-1]] = line
         elif line == "":
@@ -666,11 +697,11 @@ class TreeView(GitCommandView):
     def buildView(self, count):
         if self._current_parent not in self._view_generator:
             self._view_generator[self._current_parent] = self.viewGenerator(self._trees[self._current_parent])
-            self._view[self._current_parent] = []
+            self._structure[self._current_parent] = []
 
         while count > 0:
             info = next(self._view_generator[self._current_parent])
-            self._view[self._current_parent].append(info)
+            self._structure[self._current_parent].append(info)
             if info.is_dir == False:
                 count -= 1
 
@@ -696,11 +727,10 @@ class TreeView(GitCommandView):
 
         self._buffer.options['modifiable'] = True
         try:
-            cur_len = self._file_num[self._current_parent]
             count = cur_len - self._offset_in_content
             if count > 0:
                 self.buildView(count)
-                view = self._view[self._current_parent]
+                view = self._structure[self._current_parent]
 
                 if self._offset_in_content == 0:
                     self._buffer[:] = [self.buildLine(info) for info in view]
