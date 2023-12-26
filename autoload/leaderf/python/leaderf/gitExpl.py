@@ -591,7 +591,6 @@ class TreeView(GitCommandView):
         self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
-        self._offset_in_view = 0
 
     def generateSource(self, line):
         """
@@ -726,7 +725,7 @@ class TreeView(GitCommandView):
                                          for info in structure[self._offset_in_content:cur_len]])
 
                 self._offset_in_content = cur_len
-                # lfCmd("redraw")
+                lfCmd("redraw")
         finally:
             self._buffer.options['modifiable'] = False
 
