@@ -585,7 +585,7 @@ class TreeView(GitCommandView):
         # key is the parent hash, value is a TreeNode
         self._trees = LfOrderedDict()
         # key is the parent hash, value is a list of MetaInfo
-        self.file_structures = {}
+        self._file_structures = {}
         # key is the parent hash
         self._view_generator = {}
         self._current_parent = None
@@ -611,6 +611,26 @@ class TreeView(GitCommandView):
         return (blob_status[2], blob_status[3], blob_status[4],
                 file_names[0], file_names[1])
 
+    def appendFiles(self, tree_node):
+        """
+        append the rightmost files to file_structures
+        """
+        stack = deque()
+        stack.append(tree_node)
+
+        dirs = tree_node.dirs
+        while(len(dirs) > 0):
+            last_node = dirs.last_value()
+            stack.append(last_node)
+            dirs = last_node.dirs
+
+        while len(stack) > 0:
+            node = stack.pop()
+            for k, v in node.files.items():
+                self._file_structures[self._current_parent].append(
+                        MetaInfo(node.level, False, k, v)
+                        )
+
     def buildTree(self, line):
         """
         cmd_outputs is something as follows:
@@ -635,42 +655,33 @@ class TreeView(GitCommandView):
             if self._current_parent is None:
                 self._current_parent = parent
             self._trees[parent] = TreeNode(0)
+            self._file_structures[parent] = []
         elif line.startswith(":"):
             source = self.generateSource(line)
             file_path = source[4] if source[4] != "" else source[3]
             tree_node = self._trees.last_value()
-            *dirs, file = file_path.split(os.sep)
-            for i, d in enumerate(dirs, 1):
+            *directories, file = file_path.split(os.sep)
+            for i, d in enumerate(directories, 1):
                 if d not in tree_node.dirs:
-                    dirs = tree_node.dirs
-                    stack = deque()
-                    while(len(dirs) > 0):
-                        last_node = dirs.last_value()
-                        stack.append(last_node)
-                        dirs = last_node.dirs
-
-                    while len(stack) > 0:
-                        node = stack.pop()
-                        for k, v in node.files.items():
-                            self.file_structures[self._current_parent].append(
-                                    MetaInfo(node.level, False, k, v)
-                                    )
-
+                    # not first directory
+                    if len(tree_node.dirs) > 0:
+                        self.appendFiles(tree_node.dirs.last_value())
                     tree_node.dirs[d] = TreeNode(i)
-                    self.file_structures[self._current_parent].append(
-                            MetaInfo(i, True, d, tree_node.dirs[d])
+                    self._file_structures[self._current_parent].append(
+                            MetaInfo(tree_node.level, True, d, tree_node.dirs[d])
                             )
 
                 tree_node = tree_node.dirs[d]
 
-
             tree_node.files[file] = source
         elif line.startswith(" "):
-            self._short_stat[list(self._trees.keys())[-1]] = line
+            parent, tree_node = self._trees.last_key_value()
+            self._short_stat[parent] = line
+            self.appendFiles(tree_node)
         elif line == "":
             pass
         else:
-            parent = list(self._trees.keys())[-1]
+            parent = self._trees.last_key()
             if parent not in self._num_stat:
                 self._num_stat[parent] = {}
 
@@ -682,28 +693,6 @@ class TreeView(GitCommandView):
                 else:
                     pathname = pathname.split(" => ")[1]
             self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
-
-    def viewGenerator(self, node):
-        """
-        yield MetaInfo
-        """
-        n = node.level
-        for k, v in node.dirs.items():
-            yield MetaInfo(n, True, k, v)
-            yield from self.viewGenerator(v)
-        for k, v in node.files.items():
-            yield MetaInfo(n, False, k, v)
-
-    def buildView(self, count):
-        if self._current_parent not in self._view_generator:
-            self._view_generator[self._current_parent] = self.viewGenerator(self._trees[self._current_parent])
-            self._structure[self._current_parent] = []
-
-        while count > 0:
-            info = next(self._view_generator[self._current_parent])
-            self._structure[self._current_parent].append(info)
-            if info.is_dir == False:
-                count -= 1
 
     def buildLine(self, info):
         """
@@ -727,24 +716,21 @@ class TreeView(GitCommandView):
 
         self._buffer.options['modifiable'] = True
         try:
-            count = cur_len - self._offset_in_content
-            if count > 0:
-                self.buildView(count)
-                view = self._structure[self._current_parent]
-
+            structure = self._file_structures[self._current_parent]
+            cur_len = len(structure)
+            if cur_len > self._offset_in_content:
                 if self._offset_in_content == 0:
-                    self._buffer[:] = [self.buildLine(info) for info in view]
+                    self._buffer[:] = [self.buildLine(info) for info in structure[:cur_len]]
                 else:
                     self._buffer.append([self.buildLine(info)
-                                         for info in view[self._offset_in_view:]])
+                                         for info in structure[self._offset_in_content:]])
 
                 self._offset_in_content = cur_len
-                self._offset_in_view = len(view)
                 # lfCmd("redraw")
         finally:
             self._buffer.options['modifiable'] = False
 
-        if self._read_finished == 1 and self._offset_in_content == self._file_num[self._current_parent]:
+        if self._read_finished == 1 and self._offset_in_content == len(structure):
             self._read_finished = 2
             self._owner.writeFinished(self._window_id)
             self.stopTimer()
