@@ -444,7 +444,7 @@ class GitCommandView(object):
     def stopThread(self):
         if self._reader_thread and self._reader_thread.is_alive():
             self._stop_reader_thread = True
-            self._reader_thread.join()
+            self._reader_thread.join(0.05)
 
     def stopTimer(self):
         if self._timer_id is not None:
