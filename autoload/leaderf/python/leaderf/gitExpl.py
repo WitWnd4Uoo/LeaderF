@@ -723,7 +723,7 @@ class TreeView(GitCommandView):
                     self._buffer[:] = [self.buildLine(info) for info in structure[:cur_len]]
                 else:
                     self._buffer.append([self.buildLine(info)
-                                         for info in structure[self._offset_in_content:]])
+                                         for info in structure[self._offset_in_content:cur_len]])
 
                 self._offset_in_content = cur_len
                 # lfCmd("redraw")
