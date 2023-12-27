@@ -530,14 +530,16 @@ class TreeView(GitCommandView):
 
         ':100644 100644 72943a1 dbee026 R050\thello world.txt\thello world2.txt'
 
-        return a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
-                            (69671c59c, 084f8cdb4, M,    runtime/syntax/zsh.vim, "")
+        return a tuple like (100644, (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c))
+                            (100644, (69671c59c, 084f8cdb4, M,    runtime/syntax/zsh.vim, ""))
         """
         tmp = line.split(sep='\t')
         file_names = (tmp[1], tmp[2] if len(tmp) == 3 else "")
         blob_status = tmp[0].split()
-        return (blob_status[2], blob_status[3], blob_status[4],
+        return (blob_status[1],
+                (blob_status[2], blob_status[3], blob_status[4],
                 file_names[0], file_names[1])
+                )
 
     def appendFiles(self, tree_node):
         """
@@ -590,10 +592,13 @@ class TreeView(GitCommandView):
             self._trees[parent] = TreeNode(0)
             self._file_structures[parent] = []
         elif line.startswith(":"):
-            source = self.generateSource(line)
+            mode, source = self.generateSource(line)
             file_path = source[3] if source[4] == "" else source[4]
             tree_node = self._trees.last_value()
-            *directories, file = file_path.split(os.sep)
+            if mode == "160000": # gitlink
+                directories = file_path.split(os.sep)
+            else:
+                *directories, file = file_path.split(os.sep)
             cur_path = ""
             for i, d in enumerate(directories, 1):
                 cur_path = os.path.join(cur_path, d)
@@ -614,7 +619,8 @@ class TreeView(GitCommandView):
 
                 tree_node = tree_node.dirs[d]
 
-            tree_node.files[file] = source
+            if mode != "160000":
+                tree_node.files[file] = source
         elif line.startswith(" "):
             parent, tree_node = self._trees.last_key_value()
             self._short_stat[parent] = line
