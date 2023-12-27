@@ -444,7 +444,7 @@ class GitCommandView(object):
     def stopThread(self):
         if self._reader_thread and self._reader_thread.is_alive():
             self._stop_reader_thread = True
-            self._reader_thread.join(0.05)
+            self._reader_thread.join(0.01)
 
     def stopTimer(self):
         if self._timer_id is not None:
@@ -476,14 +476,14 @@ class LfOrderedDict(OrderedDict):
 
 
 class FolderStatus(Enum):
-    OPEN = 0
-    CLOSED = 1
+    CLOSED = 0
+    OPEN = 1
 
 
 class TreeNode(object):
-    def __init__(self, level):
+    def __init__(self, level, status=FolderStatus.OPEN):
         self.level = level
-        self.status = FolderStatus.CLOSED
+        self.status = status
         # key is the directory name, value is a TreeNode
         self.dirs = LfOrderedDict()
         # key is the file name,
@@ -492,7 +492,7 @@ class TreeNode(object):
 
 
 class MetaInfo(object):
-    def __init__(self, level, is_dir, name, info):
+    def __init__(self, level, is_dir, name, info, path):
         """
         info is TreeNode if is_dir is true or source otherwise.
         """
@@ -500,6 +500,7 @@ class MetaInfo(object):
         self.is_dir = is_dir
         self.name = name
         self.info = info
+        self.path = path
 
 
 class TreeView(GitCommandView):
@@ -514,6 +515,10 @@ class TreeView(GitCommandView):
         self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
+        folder_icons = lfEval("g:Lf_GitFolderIcons")
+        self._closed_folder_icon = folder_icons["closed"]
+        self._open_folder_icon = folder_icons["open"]
+        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100)"))
 
     def generateSource(self, line):
         """
@@ -526,6 +531,7 @@ class TreeView(GitCommandView):
         ':100644 100644 72943a1 dbee026 R050\thello world.txt\thello world2.txt'
 
         return a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
+                            (69671c59c, 084f8cdb4, M,    runtime/syntax/zsh.vim, "")
         """
         tmp = line.split(sep='\t')
         file_names = (tmp[1], tmp[2] if len(tmp) == 3 else "")
@@ -550,7 +556,7 @@ class TreeView(GitCommandView):
             node = stack.pop()
             for k, v in node.files.items():
                 self._file_structures[self._current_parent].append(
-                        MetaInfo(node.level, False, k, v)
+                        MetaInfo(node.level, False, k, v, v[3] if v[4] == "" else v[4])
                         )
 
     def buildTree(self, line):
@@ -580,17 +586,23 @@ class TreeView(GitCommandView):
             self._file_structures[parent] = []
         elif line.startswith(":"):
             source = self.generateSource(line)
-            file_path = source[4] if source[4] != "" else source[3]
+            file_path = source[3] if source[4] == "" else source[4]
             tree_node = self._trees.last_value()
             *directories, file = file_path.split(os.sep)
+            cur_path = ""
             for i, d in enumerate(directories, 1):
+                cur_path = os.path.join(cur_path, d)
                 if d not in tree_node.dirs:
                     # not first directory
                     if len(tree_node.dirs) > 0:
                         self.appendFiles(tree_node.dirs.last_value())
-                    tree_node.dirs[d] = TreeNode(i)
+                    if len(self._file_structures[self._current_parent]) > self._preopen_num:
+                        status = FolderStatus.CLOSED
+                    else:
+                        status = FolderStatus.OPEN
+                    tree_node.dirs[d] = TreeNode(i, status)
                     self._file_structures[self._current_parent].append(
-                            MetaInfo(tree_node.level, True, d, tree_node.dirs[d])
+                            MetaInfo(tree_node.level, True, d, tree_node.dirs[d], cur_path)
                             )
 
                 tree_node = tree_node.dirs[d]
@@ -621,7 +633,11 @@ class TreeView(GitCommandView):
         info is MetaInfo
         """
         if info.is_dir:
-            return "{}{}/".format("  " * info.level, info.name)
+            if info.info.status == FolderStatus.CLOSED:
+                icon = self._closed_folder_icon
+            else:
+                icon = self._open_folder_icon
+            return "{}{} {}/".format("  " * info.level, icon, info.name)
         else:
             return "{}{}".format("  " * info.level, info.name)
 
