@@ -543,12 +543,17 @@ class TreeView(GitCommandView):
         """
         append the rightmost files to file_structures
         """
+        if tree_node.status == FolderStatus.CLOSED:
+            return
+
         stack = deque()
         stack.append(tree_node)
 
         dirs = tree_node.dirs
         while(len(dirs) > 0):
             last_node = dirs.last_value()
+            if last_node.status == FolderStatus.CLOSED:
+                break
             stack.append(last_node)
             dirs = last_node.dirs
 
@@ -561,7 +566,7 @@ class TreeView(GitCommandView):
 
     def buildTree(self, line):
         """
-        cmd_outputs is something as follows:
+        command output is something as follows:
 
         # 9d0ccb54c743424109751a82a742984699e365fe 63aa0c07bcd16ddac52d5275b9513712b780bc25
         :100644 100644 0cbabf4 d641678 M        src/a.txt
@@ -596,14 +601,16 @@ class TreeView(GitCommandView):
                     # not first directory
                     if len(tree_node.dirs) > 0:
                         self.appendFiles(tree_node.dirs.last_value())
+
                     if len(self._file_structures[self._current_parent]) > self._preopen_num:
                         status = FolderStatus.CLOSED
                     else:
                         status = FolderStatus.OPEN
                     tree_node.dirs[d] = TreeNode(i, status)
-                    self._file_structures[self._current_parent].append(
-                            MetaInfo(tree_node.level, True, d, tree_node.dirs[d], cur_path)
-                            )
+                    if tree_node.status == FolderStatus.OPEN:
+                        self._file_structures[self._current_parent].append(
+                                MetaInfo(tree_node.level, True, d, tree_node.dirs[d], cur_path)
+                                )
 
                 tree_node = tree_node.dirs[d]
 
@@ -639,7 +646,9 @@ class TreeView(GitCommandView):
                 icon = self._open_folder_icon
             return "{}{} {}/".format("  " * info.level, icon, info.name)
         else:
-            return "{}{}".format("  " * info.level, info.name)
+            return "{}{}{}".format("  " * info.level,
+                                   webDevIconsGetFileTypeSymbol(info.name),
+                                   info.name)
 
     def writeBuffer(self):
         if self._current_parent is None:
