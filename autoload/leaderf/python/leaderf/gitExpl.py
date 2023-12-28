@@ -652,9 +652,12 @@ class TreeView(GitCommandView):
                 icon = self._open_folder_icon
             return "{}{} {}/".format("  " * info.level, icon, info.name)
         else:
-            return "{}{}{}".format("  " * info.level,
-                                   webDevIconsGetFileTypeSymbol(info.name),
-                                   info.name)
+            num_stat = self._num_stat[self._current_parent].get(info.path, "")
+            return "{}{}{}\t{}".format("  " * info.level,
+                                       webDevIconsGetFileTypeSymbol(info.name),
+                                       info.name,
+                                       num_stat
+                                       )
 
     def writeBuffer(self):
         if self._current_parent is None:
