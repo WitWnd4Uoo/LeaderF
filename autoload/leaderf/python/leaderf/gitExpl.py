@@ -519,6 +519,18 @@ class TreeView(GitCommandView):
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
         self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100)"))
+        self._add_icon = lfEval("get(g:, 'Lf_GitAdditionIcon', '')")
+        self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
+        self._del_icon = lfEval("get(g:, 'Lf_GitDeletionIcon', '')")
+        self._modification_icon = lfEval("get(g:, 'Lf_GitModificationIcon', '')")
+        self._rename_icon = lfEval("get(g:, 'Lf_GitRenamingIcon', '')")
+        self._status_icons = {
+                "A": self._add_icon,
+                "C": self._copy_icon,
+                "D": self._del_icon,
+                "M": self._modification_icon,
+                "R": self._rename_icon,
+                }
 
     def generateSource(self, line):
         """
@@ -653,11 +665,22 @@ class TreeView(GitCommandView):
             return "{}{} {}/".format("  " * info.level, icon, info.name)
         else:
             num_stat = self._num_stat[self._current_parent].get(info.path, "")
-            return "{}{}{}\t{}".format("  " * info.level,
-                                       webDevIconsGetFileTypeSymbol(info.name),
-                                       info.name,
-                                       num_stat
-                                       )
+            icon = self._status_icons.get(info.info[2][0], self._modification_icon)
+
+            orig_name = ""
+            if info.info[2][0] in ("R", "C"):
+                head, tail = os.path.split(info.info[3])
+                if head == os.path.dirname(info.info[4]):
+                    orig_name = " <= {}".format(tail)
+                else:
+                    orig_name = " <= {}".format(info.info[3])
+
+            return "{}{} {}{}\t{}".format("  " * info.level,
+                                          icon,
+                                          info.name,
+                                          orig_name,
+                                          num_stat
+                                          )
 
     def writeBuffer(self):
         if self._current_parent is None:
