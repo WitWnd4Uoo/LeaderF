@@ -619,7 +619,7 @@ class TreeView(GitCommandView):
                     if len(tree_node.dirs) > 0:
                         self.appendFiles(tree_node.dirs.last_value())
 
-                    if len(self._file_structures[self._current_parent]) > self._preopen_num:
+                    if len(self._file_structures[self._current_parent]) >= self._preopen_num:
                         status = FolderStatus.CLOSED
                     else:
                         status = FolderStatus.OPEN
