@@ -651,7 +651,10 @@ class TreeView(GitCommandView):
                     pathname = re.sub(r'{.*?=> (.*?)}', r'\1', pathname)
                 else:
                     pathname = pathname.split(" => ")[1]
-            self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
+            if added == "-" and deleted == "-":
+                self._num_stat[parent][pathname] = "- -"
+            else:
+                self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
 
     def buildLine(self, info):
         """
