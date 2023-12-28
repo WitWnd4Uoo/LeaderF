@@ -674,14 +674,14 @@ class TreeView(GitCommandView):
             if info.info[2][0] in ("R", "C"):
                 head, tail = os.path.split(info.info[3])
                 if head == os.path.dirname(info.info[4]):
-                    orig_name = " <= {}".format(tail)
+                    orig_name = "{} => ".format(tail)
                 else:
-                    orig_name = " <= {}".format(info.info[3])
+                    orig_name = "{} => ".format(info.info[3])
 
             return "{}{} {}{}\t{}".format("  " * info.level,
                                           icon,
-                                          info.name,
                                           orig_name,
+                                          info.name,
                                           num_stat
                                           )
 
