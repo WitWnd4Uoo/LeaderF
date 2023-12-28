@@ -667,7 +667,7 @@ class TreeView(GitCommandView):
                 icon = self._open_folder_icon
             return "{}{} {}/".format("  " * info.level, icon, info.name)
         else:
-            num_stat = self._num_stat[self._current_parent].get(info.path, "")
+            num_stat = self._num_stat.get(self._current_parent, {}).get(info.path, "")
             icon = self._status_icons.get(info.info[2][0], self._modification_icon)
 
             orig_name = ""
