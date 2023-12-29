@@ -613,7 +613,10 @@ class TreeView(GitCommandView):
                 *directories, file = file_path.split("/")
             cur_path = ""
             for i, d in enumerate(directories, 1):
-                cur_path = os.path.join(cur_path, d)
+                if os.name != 'nt':
+                    cur_path = os.path.join(cur_path, d)
+                else:
+                    cur_path = "/".join([cur_path, d])
                 if d not in tree_node.dirs:
                     # not first directory
                     if len(tree_node.dirs) > 0:
