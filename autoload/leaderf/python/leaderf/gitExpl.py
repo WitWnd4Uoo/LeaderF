@@ -578,6 +578,9 @@ class TreeView(GitCommandView):
                         MetaInfo(node.level, False, k, v, v[3] if v[4] == "" else v[4])
                         )
 
+    def buildFileStructure(self, tree_node):
+        pass
+
     def buildTree(self, line):
         """
         command output is something as follows:
@@ -617,6 +620,7 @@ class TreeView(GitCommandView):
                     cur_path = os.path.join(cur_path, d)
                 else:
                     cur_path = "/".join([cur_path, d])
+
                 if d not in tree_node.dirs:
                     # not first directory
                     if len(tree_node.dirs) > 0:
