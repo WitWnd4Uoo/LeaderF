@@ -264,7 +264,7 @@ class GitLogExplCommand(GitCommand):
         super(GitLogExplCommand, self).__init__(arguments_dict, source)
 
     def buildCommandAndBufferName(self):
-        self._cmd = 'git show -m --raw --numstat --shortstat --pretty=format:"# %P" --no-abbrev {}'.format(self._source)
+        self._cmd = 'git show -m --raw -C --numstat --shortstat --pretty=format:"# %P" --no-abbrev {}'.format(self._source)
         self._buffer_name = "LeaderF://navigation/" + self._source
         self._file_type_cmd = ""
 
@@ -608,9 +608,9 @@ class TreeView(GitCommandView):
             file_path = source[3] if source[4] == "" else source[4]
             tree_node = self._trees.last_value()
             if mode == "160000": # gitlink
-                directories = file_path.split(os.sep)
+                directories = file_path.split("/")
             else:
-                *directories, file = file_path.split(os.sep)
+                *directories, file = file_path.split("/")
             cur_path = ""
             for i, d in enumerate(directories, 1):
                 cur_path = os.path.join(cur_path, d)
@@ -673,11 +673,7 @@ class TreeView(GitCommandView):
             orig_name = ""
             if info.info[2][0] in ("R", "C"):
                 head, tail = os.path.split(info.info[3])
-                dirname = os.path.dirname(info.info[4])
-                if head == dirname:
-                    orig_name = "{} => ".format(tail)
-                else:
-                    orig_name = "{} => ".format(os.path.relpath(info.info[3], dirname))
+                orig_name = "{} => ".format(os.path.relpath(info.info[3], os.path.dirname(info.info[4])))
 
             return "{}{} {}{}\t{}".format("  " * info.level,
                                           icon,
