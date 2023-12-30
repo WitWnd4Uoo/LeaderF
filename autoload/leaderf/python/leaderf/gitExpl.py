@@ -481,8 +481,7 @@ class FolderStatus(Enum):
 
 
 class TreeNode(object):
-    def __init__(self, level, status=FolderStatus.OPEN):
-        self.level = level
+    def __init__(self, status=FolderStatus.OPEN):
         self.status = status
         # key is the directory name, value is a TreeNode
         self.dirs = LfOrderedDict()
@@ -553,33 +552,49 @@ class TreeView(GitCommandView):
                 file_names[0], file_names[1])
                 )
 
-    def appendFiles(self, tree_node):
-        """
-        append the rightmost files to file_structures
-        """
+    def buildFileStructure(self, level, name, tree_node, path):
         if tree_node.status == FolderStatus.CLOSED:
             return
 
-        stack = deque()
-        stack.append(tree_node)
+        if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
+            dir_name, node = tree_node.dirs.last_key_value()
+            self.buildFileStructure(level, "{}/{}".format(name, dir_name),
+                                    node, "{}{}/".format(path, dir_name)
+                                    )
+        else:
+            self._file_structures[self._current_parent].append(
+                    MetaInfo(level, True, name, tree_node, path)
+                    )
 
-        dirs = tree_node.dirs
-        while(len(dirs) > 0):
-            last_node = dirs.last_value()
-            if last_node.status == FolderStatus.CLOSED:
-                break
-            stack.append(last_node)
-            dirs = last_node.dirs
+            for dir_name, node in tree_node.dirs.items():
+                self.buildFileStructure(level + 1, dir_name, node,
+                                        "{}{}/".format(path, dir_name))
 
-        while len(stack) > 0:
-            node = stack.pop()
-            for k, v in node.files.items():
-                self._file_structures[self._current_parent].append(
-                        MetaInfo(node.level, False, k, v, v[3] if v[4] == "" else v[4])
-                        )
+            self.appendFiles(level + 1, tree_node)
 
-    def buildFileStructure(self, tree_node):
-        pass
+    def appendRemainingFiles(self, tree_node):
+        if tree_node.status == FolderStatus.CLOSED:
+            return
+
+        dir_name, node = tree_node.dirs.last_key_value()
+        if len(node.dirs) > 1:
+            child_dir_name, child_node = node.dirs.last_key_value()
+            self.buildFileStructure(1, child_dir_name, child_node,
+                                    "{}/{}/".format(dir_name, child_dir_name))
+
+            self.appendFiles(1, node)
+        else:
+            self.buildFileStructure(0, dir_name, node, dir_name + "/")
+
+    def appendFiles(self, level, tree_node):
+        if tree_node.status == FolderStatus.CLOSED:
+            return
+
+        for k, v in tree_node.files.items():
+            self._file_structures[self._current_parent].append(
+                    MetaInfo(level, False, k, v,
+                             v[3] if v[4] == "" else v[4])
+                    )
 
     def buildTree(self, line):
         """
@@ -604,7 +619,7 @@ class TreeView(GitCommandView):
                 parent = parents[size + 1]
             if self._current_parent is None:
                 self._current_parent = parent
-            self._trees[parent] = TreeNode(0)
+            self._trees[parent] = TreeNode()
             self._file_structures[parent] = []
         elif line.startswith(":"):
             mode, source = self.generateSource(line)
@@ -614,27 +629,31 @@ class TreeView(GitCommandView):
                 directories = file_path.split("/")
             else:
                 *directories, file = file_path.split("/")
-            cur_path = ""
-            for i, d in enumerate(directories, 1):
-                if os.name != 'nt':
-                    cur_path = os.path.join(cur_path, d)
-                else:
-                    cur_path = "/".join([cur_path, d])
+            for i, d in enumerate(directories, 0):
+                if i == 0:
+                    level0_dir_name = d
 
                 if d not in tree_node.dirs:
                     # not first directory
                     if len(tree_node.dirs) > 0:
-                        self.appendFiles(tree_node.dirs.last_value())
+                        if i == 1:
+                            if len(tree_node.dirs) == 1:
+                                self._file_structures[self._current_parent].append(
+                                        MetaInfo(0, True, level0_dir_name,
+                                                 tree_node, level0_dir_name + "/")
+                                        )
+
+                            dir_name, node = tree_node.dirs.last_key_value()
+                            self.buildFileStructure(1, dir_name, node,
+                                                    "{}/{}/".format(level0_dir_name, dir_name))
+                        elif i == 0:
+                            self.appendRemainingFiles(tree_node)
 
                     if len(self._file_structures[self._current_parent]) >= self._preopen_num:
                         status = FolderStatus.CLOSED
                     else:
                         status = FolderStatus.OPEN
-                    tree_node.dirs[d] = TreeNode(i, status)
-                    if tree_node.status == FolderStatus.OPEN:
-                        self._file_structures[self._current_parent].append(
-                                MetaInfo(tree_node.level, True, d, tree_node.dirs[d], cur_path)
-                                )
+                    tree_node.dirs[d] = TreeNode(status)
 
                 tree_node = tree_node.dirs[d]
 
@@ -643,7 +662,8 @@ class TreeView(GitCommandView):
         elif line.startswith(" "):
             parent, tree_node = self._trees.last_key_value()
             self._short_stat[parent] = line
-            self.appendFiles(tree_node)
+            self.appendRemainingFiles(tree_node)
+            self.appendFiles(0, tree_node)
         elif line == "":
             pass
         else:
