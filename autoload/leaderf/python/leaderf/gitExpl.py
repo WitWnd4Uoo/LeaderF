@@ -961,22 +961,15 @@ class SplitDiffPanel(Panel):
 
 class NavigationPanel(Panel):
     def __init__(self):
-        self._views = {}
-        self._sources = set()
+        self._tree_view = None
 
     def register(self, view):
-        self._views[view.getBufferName()] = view
-        self._sources.add(view.getSource())
+        self._tree_view = view
 
-    def deregister(self, view):
-        name = view.getBufferName()
-        if name in self._views:
-            self._sources.discard(self._views[name].getSource())
-            self._views[name].cleanup()
-            del self._views[name]
-
-    def getSources(self):
-        return self._sources
+    def cleanup(self):
+        if self._tree_view is not None:
+            self._tree_view.cleanup()
+            self._tree_view = None
 
     def _createWindow(self, win_pos, buffer_name):
         if win_pos == 'top':
@@ -988,21 +981,20 @@ class NavigationPanel(Panel):
         elif win_pos == 'right':
             lfCmd("silent! noa keepa keepj bel vsp {}".format(buffer_name))
         else:
-            lfCmd("silent! keepa keepj hide edit {}".format(buffer_name))
+            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
 
         return int(lfEval("win_getid()"))
 
-    def create(self, cmd, content=None):
+    def create(self, arguments_dict, source, **kwargs):
+        cmd = GitLogExplCommand(arguments_dict, source)
         buffer_name = cmd.getBufferName()
-        if buffer_name in self._views and self._views[buffer_name].valid():
-            self._views[buffer_name].create(buf_content=content)
-        else:
-            winid = self._createWindow(cmd.getArguments().get("--position", [""])[0], buffer_name)
-            TreeView(self, cmd, winid).create(buf_content=content)
+        winid = self._createWindow(arguments_dict.get("--navigation-position", [""])[0], buffer_name)
+        TreeView(self, cmd, winid).create()
 
     def writeBuffer(self):
-        for v in self._views.values():
-            v.writeBuffer()
+        # called in idle
+        if self._tree_view is not None:
+            self._tree_view.writeBuffer()
 
 
 class DiffViewPanel(Panel):
@@ -1014,7 +1006,16 @@ class ExplorerPage(object):
     def __init__(self):
         self._navigation_panel = None
         self._diff_view_panel = None
+        self.tabpage = None
 
+    def create(self, arguments_dict, source, **kwargs):
+        lfCmd("tabnew")
+        self.tabpage = vim.current.tabpage
+        self._navigation_panel = NavigationPanel()
+        self._navigation_panel.create(arguments_dict, source, **kwargs)
+
+    def cleanup(self):
+        pass
 
 #*****************************************************
 # GitExplManager
@@ -1312,6 +1313,11 @@ class GitDiffExplManager(GitExplManager):
 
 
 class GitLogExplManager(GitExplManager):
+    def __init__(self):
+        super(GitLogExplManager, self).__init__()
+        # key is source, value is ExplorerPage
+        self._pages = {}
+
     def _getExplorer(self):
         if self._explorer is None:
             self._explorer = GitLogExplorer()
@@ -1387,16 +1393,11 @@ class GitLogExplManager(GitExplManager):
         source = self.getSource(line)
 
         if "--explorer" in self._arguments:
-            pass
-            if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
-                lfCmd("tabnew")
-
-            tabpage_count = len(vim.tabpages)
-
-            NavigationPanel().create(GitLogExplCommand(self._arguments, source), None)
-
-            if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
-                tabmove()
+            if source in self._pages:
+                vim.current.tabpage = self._pages[source].tabpage
+            else:
+                self._pages[source] = ExplorerPage()
+                self._pages[source].create(self._arguments, source, **kwargs)
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
                 lfCmd("tabnew")
