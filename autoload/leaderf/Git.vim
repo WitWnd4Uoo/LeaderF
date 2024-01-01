@@ -60,6 +60,11 @@ function! leaderf#Git#Suicide(view_id)
     exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.suicide()", a:view_id)
 endfunction
 
+function! leaderf#Git#CleanupExplorerPage(view_id)
+    exec g:Lf_py "import ctypes"
+    exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.cleanup()", a:view_id)
+endfunction
+
 function! leaderf#Git#Commands()
     if !exists("g:Lf_GitCommands")
         let g:Lf_GitCommands = [

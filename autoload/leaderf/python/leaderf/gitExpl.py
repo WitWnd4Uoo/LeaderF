@@ -264,7 +264,8 @@ class GitLogExplCommand(GitCommand):
         super(GitLogExplCommand, self).__init__(arguments_dict, source)
 
     def buildCommandAndBufferName(self):
-        self._cmd = 'git show -m --raw -C --numstat --shortstat --pretty=format:"# %P" --no-abbrev {}'.format(self._source)
+        self._cmd = ('git show -m --raw -C --numstat --shortstat '
+                     '--pretty=format:"# %P" --no-abbrev {}').format(self._source)
         self._buffer_name = "LeaderF://navigation/" + self._source
         self._file_type_cmd = ""
 
@@ -371,6 +372,7 @@ class GitCommandView(object):
             lfCmd("call win_execute({}, 'setlocal nospell')".format(self._window_id))
             lfCmd("call win_execute({}, 'setlocal nomodifiable')".format(self._window_id))
             lfCmd("call win_execute({}, 'setlocal nofoldenable')".format(self._window_id))
+            lfCmd("call win_execute({}, 'setlocal nolist')".format(self._window_id))
             lfCmd("call win_execute({}, '{}')".format(self._window_id, self._cmd.getFileTypeCommand()))
             if bufhidden == 'wipe':
                 lfCmd("augroup Lf_Git | augroup END")
@@ -509,8 +511,6 @@ class TreeView(GitCommandView):
         self._trees = LfOrderedDict()
         # key is the parent hash, value is a list of MetaInfo
         self._file_structures = {}
-        # key is the parent hash
-        self._view_generator = {}
         self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
@@ -754,6 +754,10 @@ class TreeView(GitCommandView):
             self._read_finished = 1
             print(e)
 
+    def cleanup(self):
+        super(TreeView, self).cleanup()
+        lfCmd("bwipe {}".format(self._buffer.number))
+
 
 class Panel(object):
     def __init__(self):
@@ -971,25 +975,8 @@ class NavigationPanel(Panel):
             self._tree_view.cleanup()
             self._tree_view = None
 
-    def _createWindow(self, win_pos, buffer_name):
-        if win_pos == 'top':
-            lfCmd("silent! noa keepa keepj abo sp {}".format(buffer_name))
-        elif win_pos == 'bottom':
-            lfCmd("silent! noa keepa keepj bel sp {}".format(buffer_name))
-        elif win_pos == 'left':
-            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
-        elif win_pos == 'right':
-            lfCmd("silent! noa keepa keepj bel vsp {}".format(buffer_name))
-        else:
-            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
-
-        return int(lfEval("win_getid()"))
-
-    def create(self, arguments_dict, source, **kwargs):
-        cmd = GitLogExplCommand(arguments_dict, source)
-        buffer_name = cmd.getBufferName()
-        winid = self._createWindow(arguments_dict.get("--navigation-position", [""])[0], buffer_name)
-        TreeView(self, cmd, winid).create()
+    def create(self, cmd, winid):
+        TreeView(self, cmd, winid).create(bufhidden="hide")
 
     def writeBuffer(self):
         # called in idle
@@ -1008,14 +995,37 @@ class ExplorerPage(object):
         self._diff_view_panel = None
         self.tabpage = None
 
-    def create(self, arguments_dict, source, **kwargs):
-        lfCmd("tabnew")
+    def _createWindow(self, win_pos, buffer_name):
+        if win_pos == 'top':
+            lfCmd("silent! noa keepa keepj abo sp {}".format(buffer_name))
+        elif win_pos == 'bottom':
+            lfCmd("silent! noa keepa keepj bel sp {}".format(buffer_name))
+        elif win_pos == 'left':
+            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
+        elif win_pos == 'right':
+            lfCmd("silent! noa keepa keepj bel vsp {}".format(buffer_name))
+        else:
+            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
+
+        return int(lfEval("win_getid()"))
+
+    def create(self, arguments_dict, source):
+        lfCmd("noautocmd tabnew")
         self.tabpage = vim.current.tabpage
+
+        cmd = GitLogExplCommand(arguments_dict, source)
+        win_pos = arguments_dict.get("--navigation-position", [""])[0]
+        winid = self._createWindow(win_pos, cmd.getBufferName())
+
         self._navigation_panel = NavigationPanel()
-        self._navigation_panel.create(arguments_dict, source, **kwargs)
+        self._navigation_panel.create(cmd, winid)
 
     def cleanup(self):
-        pass
+        if self._navigation_panel is not None:
+            self._navigation_panel.cleanup()
+
+        if self._diff_view_panel is not None:
+            self._diff_view_panel.cleanup()
 
 #*****************************************************
 # GitExplManager
@@ -1379,11 +1389,7 @@ class GitLogExplManager(GitExplManager):
             self._match_ids.append(id)
 
     def _accept(self, file, mode, *args, **kwargs):
-        if "--explorer" in self._arguments:
-            pass
-            super(GitExplManager, self)._accept(file, mode, *args, **kwargs)
-        else:
-            super(GitExplManager, self)._accept(file, mode, *args, **kwargs)
+        super(GitExplManager, self)._accept(file, mode, *args, **kwargs)
 
     def _acceptSelection(self, *args, **kwargs):
         if len(args) == 0:
@@ -1396,8 +1402,12 @@ class GitLogExplManager(GitExplManager):
             if source in self._pages:
                 vim.current.tabpage = self._pages[source].tabpage
             else:
+                lfCmd("augroup Lf_Git | augroup END")
+                lfCmd("autocmd! Lf_Git TabClosed * call leaderf#Git#CleanupExplorerPage({})"
+                      .format(id(self)))
+
                 self._pages[source] = ExplorerPage()
-                self._pages[source].create(self._arguments, source, **kwargs)
+                self._pages[source].create(self._arguments, source)
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
                 lfCmd("tabnew")
@@ -1409,6 +1419,12 @@ class GitLogExplManager(GitExplManager):
             if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
                 tabmove()
 
+    def cleanup(self):
+        for k, v in self._pages.items():
+            if not v.tabpage.valid:
+                v.cleanup()
+                del self._pages[k]
+                return
 
 #*****************************************************
 # gitExplManager is a singleton
