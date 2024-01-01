@@ -1421,7 +1421,7 @@ class GitLogExplManager(GitExplManager):
 
     def cleanup(self):
         for k, v in self._pages.items():
-            if not v.tabpage.valid:
+            if v.tabpage not in vim.tabpages:
                 v.cleanup()
                 del self._pages[k]
                 return
