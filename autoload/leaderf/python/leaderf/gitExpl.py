@@ -518,11 +518,11 @@ class TreeView(GitCommandView):
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
         self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100)"))
-        self._add_icon = lfEval("get(g:, 'Lf_GitAdditionIcon', '')")
+        self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
-        self._del_icon = lfEval("get(g:, 'Lf_GitDeletionIcon', '')")
+        self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")
         self._modification_icon = lfEval("get(g:, 'Lf_GitModificationIcon', '')")
-        self._rename_icon = lfEval("get(g:, 'Lf_GitRenamingIcon', '')")
+        self._rename_icon = lfEval("get(g:, 'Lf_GitRenameIcon', '')")
         self._status_icons = {
                 "A": self._add_icon,
                 "C": self._copy_icon,
@@ -530,6 +530,50 @@ class TreeView(GitCommandView):
                 "M": self._modification_icon,
                 "R": self._rename_icon,
                 }
+        self._match_ids = []
+        self.enableColor()
+
+    def enableColor(self):
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolder'', ''\S*/'', 10)')"""
+              .format(self._window_id))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolderIcon'', ''^\s*\zs[{}{}]'', 10)')"""
+              .format(self._window_id, self._closed_folder_icon, self._open_folder_icon))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitAddIcon'', ''^\s*\zs{}'', 10)')"""
+              .format(self._window_id, self._add_icon))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitCopyIcon'', ''^\s*\zs{}'', 10)')"""
+              .format(self._window_id, self._copy_icon))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitDelIcon'', ''^\s*\zs{}'', 10)')"""
+              .format(self._window_id, self._del_icon))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitModificationIcon'', ''^\s*\zs{}'', 10)')"""
+              .format(self._window_id, self._modification_icon))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', ''^\s*\zs{}'', 10)')"""
+              .format(self._window_id, self._rename_icon))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatAdd'', ''\t\zs+\d\+'', 10)')"""
+              .format(self._window_id))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatDel'', ''\t+\d\+\s\+\zs-\d\+'', 10)')"""
+              .format(self._window_id))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatBinary'', ''\t\zs(Bin)'', 10)')"""
+              .format(self._window_id))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
 
     def generateSource(self, line):
         """
@@ -679,9 +723,18 @@ class TreeView(GitCommandView):
                 else:
                     pathname = pathname.split(" => ")[1]
             if added == "-" and deleted == "-":
-                self._num_stat[parent][pathname] = "- -"
+                self._num_stat[parent][pathname] = "(Bin)"
             else:
                 self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
+
+    def expandFolder(self, line_num):
+        pass
+
+    def collapseFolder(self, line_num):
+        pass
+
+    def findFile(self, path):
+        pass
 
     def buildLine(self, info):
         """
@@ -757,6 +810,8 @@ class TreeView(GitCommandView):
     def cleanup(self):
         super(TreeView, self).cleanup()
         lfCmd("bwipe {}".format(self._buffer.number))
+
+        self._match_ids = []
 
 
 class Panel(object):
@@ -1026,6 +1081,7 @@ class ExplorerPage(object):
 
         if self._diff_view_panel is not None:
             self._diff_view_panel.cleanup()
+
 
 #*****************************************************
 # GitExplManager
