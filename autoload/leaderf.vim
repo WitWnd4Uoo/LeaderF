@@ -144,8 +144,8 @@ call s:InitDict('g:Lf_GtagsfilesCmd', {
 call s:InitVar('g:Lf_HistoryEditPromptIfEmpty', 1)
 call s:InitVar('g:Lf_PopupBorders', ["─","│","─","│","╭","╮","╯","╰"])
 call s:InitVar('g:Lf_GitFolderIcons', {
-            \ 'open': '',
-            \ 'closed': '',
+            \ 'open': '',
+            \ 'closed': '',
             \})
 
 let s:Lf_CommandMap = {

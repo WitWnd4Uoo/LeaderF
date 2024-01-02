@@ -518,9 +518,9 @@ class TreeView(GitCommandView):
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
         self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100)"))
-        self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")
+        self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    # 
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
-        self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")
+        self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    # 
         self._modification_icon = lfEval("get(g:, 'Lf_GitModificationIcon', '')")
         self._rename_icon = lfEval("get(g:, 'Lf_GitRenameIcon', '')")
         self._status_icons = {
