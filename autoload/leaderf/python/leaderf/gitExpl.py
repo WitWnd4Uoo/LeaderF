@@ -511,8 +511,9 @@ class MetaInfo(object):
 
 
 class TreeView(GitCommandView):
-    def __init__(self, owner, cmd, window_id):
+    def __init__(self, owner, cmd, window_id, project_root):
         super(TreeView, self).__init__(owner, cmd, window_id)
+        self._project_root = project_root
         # key is the parent hash, value is a TreeNode
         self._trees = LfOrderedDict()
         # key is the parent hash, value is a list of MetaInfo
@@ -775,6 +776,7 @@ class TreeView(GitCommandView):
 
     def setOptions(self, bufhidden):
         super(TreeView, self).setOptions(bufhidden)
+        lfCmd("call win_execute({}, 'setlocal stl={}')".format(self._window_id, self._project_root + "/"))
         lfCmd("call win_execute({}, 'setlocal cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         try:
@@ -782,6 +784,16 @@ class TreeView(GitCommandView):
                   .format(self._window_id))
         except vim.error:
             lfCmd("call win_execute({}, 'setlocal nolist')".format(self._window_id))
+
+    def initBuffer(self):
+        self._buffer.options['modifiable'] = True
+        try:
+            self._buffer[:] = [
+                    '" Press <F1> for help',
+                    '',
+                    ]
+        finally:
+            self._buffer.options['modifiable'] = False
 
     def writeBuffer(self):
         if self._current_parent is None:
@@ -799,11 +811,8 @@ class TreeView(GitCommandView):
             structure = self._file_structures[self._current_parent]
             cur_len = len(structure)
             if cur_len > self._offset_in_content:
-                if self._offset_in_content == 0:
-                    self._buffer[:] = [self.buildLine(info) for info in structure[:cur_len]]
-                else:
-                    self._buffer.append([self.buildLine(info)
-                                         for info in structure[self._offset_in_content:cur_len]])
+                self._buffer.append([self.buildLine(info)
+                                     for info in structure[self._offset_in_content:cur_len]])
 
                 self._offset_in_content = cur_len
                 lfCmd("redraw")
@@ -1051,8 +1060,8 @@ class NavigationPanel(Panel):
             self._tree_view.cleanup()
             self._tree_view = None
 
-    def create(self, cmd, winid):
-        TreeView(self, cmd, winid).create(bufhidden="hide")
+    def create(self, cmd, winid, project_root):
+        TreeView(self, cmd, winid, project_root).create(bufhidden="hide")
 
     def writeBuffer(self):
         # called in idle
@@ -1066,7 +1075,8 @@ class DiffViewPanel(Panel):
 
 
 class ExplorerPage(object):
-    def __init__(self):
+    def __init__(self, project_root):
+        self._project_root = project_root
         self._navigation_panel = None
         self._diff_view_panel = None
         self.tabpage = None
@@ -1094,7 +1104,7 @@ class ExplorerPage(object):
         winid = self._createWindow(win_pos, cmd.getBufferName())
 
         self._navigation_panel = NavigationPanel()
-        self._navigation_panel.create(cmd, winid)
+        self._navigation_panel.create(cmd, winid, self._project_root)
 
     def cleanup(self):
         if self._navigation_panel is not None:
@@ -1483,7 +1493,7 @@ class GitLogExplManager(GitExplManager):
                 lfCmd("autocmd! Lf_Git TabClosed * call leaderf#Git#CleanupExplorerPage({})"
                       .format(id(self)))
 
-                self._pages[source] = ExplorerPage()
+                self._pages[source] = ExplorerPage(self._project_root)
                 self._pages[source].create(self._arguments, source)
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
