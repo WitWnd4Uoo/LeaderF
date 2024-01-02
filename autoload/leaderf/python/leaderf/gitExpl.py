@@ -353,6 +353,20 @@ class GitCommandView(object):
         self._reader_thread.daemon = True
         self._reader_thread.start()
 
+    def setOptions(self, bufhidden):
+        lfCmd("call win_execute({}, 'setlocal nobuflisted')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal buftype=nofile')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal bufhidden={}')".format(self._window_id, bufhidden))
+        lfCmd("call win_execute({}, 'setlocal undolevels=-1')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal noswapfile')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal nospell')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal nomodifiable')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal nofoldenable')".format(self._window_id))
+        lfCmd("call win_execute({}, '{}')".format(self._window_id, self._cmd.getFileTypeCommand()))
+
+    def initBuffer(self):
+        pass
+
     def create(self, bufhidden='wipe', buf_content=None):
         if self._buffer is not None:
             self._buffer.options['modifiable'] = True
@@ -364,16 +378,7 @@ class GitCommandView(object):
         self.init()
 
         if self._buffer is None:
-            lfCmd("call win_execute({}, 'setlocal nobuflisted')".format(self._window_id))
-            lfCmd("call win_execute({}, 'setlocal buftype=nofile')".format(self._window_id))
-            lfCmd("call win_execute({}, 'setlocal bufhidden={}')".format(self._window_id, bufhidden))
-            lfCmd("call win_execute({}, 'setlocal undolevels=-1')".format(self._window_id))
-            lfCmd("call win_execute({}, 'setlocal noswapfile')".format(self._window_id))
-            lfCmd("call win_execute({}, 'setlocal nospell')".format(self._window_id))
-            lfCmd("call win_execute({}, 'setlocal nomodifiable')".format(self._window_id))
-            lfCmd("call win_execute({}, 'setlocal nofoldenable')".format(self._window_id))
-            lfCmd("call win_execute({}, 'setlocal nolist')".format(self._window_id))
-            lfCmd("call win_execute({}, '{}')".format(self._window_id, self._cmd.getFileTypeCommand()))
+            self.setOptions(bufhidden)
             if bufhidden == 'wipe':
                 lfCmd("augroup Lf_Git | augroup END")
                 lfCmd("call win_execute({}, 'autocmd! Lf_Git BufWipeout <buffer> call leaderf#Git#Suicide({})')"
@@ -400,6 +405,7 @@ class GitCommandView(object):
             self._owner.writeFinished(self._window_id)
             return
 
+        self.initBuffer()
         self.start()
 
 
@@ -511,6 +517,8 @@ class TreeView(GitCommandView):
         self._trees = LfOrderedDict()
         # key is the parent hash, value is a list of MetaInfo
         self._file_structures = {}
+        # to protect self._file_structures
+        self._lock = threading.Lock()
         self._current_parent = None
         self._short_stat = {}
         self._num_stat = {}
@@ -518,9 +526,9 @@ class TreeView(GitCommandView):
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
         self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100)"))
-        self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    # 
+        self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    #  
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
-        self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    # 
+        self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    #  
         self._modification_icon = lfEval("get(g:, 'Lf_GitModificationIcon', '')")
         self._rename_icon = lfEval("get(g:, 'Lf_GitRenameIcon', '')")
         self._status_icons = {
@@ -673,33 +681,34 @@ class TreeView(GitCommandView):
                 directories = file_path.split("/")
             else:
                 *directories, file = file_path.split("/")
-            for i, d in enumerate(directories, 0):
-                if i == 0:
-                    level0_dir_name = d
+            with self._lock:
+                for i, d in enumerate(directories, 0):
+                    if i == 0:
+                        level0_dir_name = d
 
-                if d not in tree_node.dirs:
-                    # not first directory
-                    if len(tree_node.dirs) > 0:
-                        if i == 1:
-                            if len(tree_node.dirs) == 1:
-                                self._file_structures[self._current_parent].append(
-                                        MetaInfo(0, True, level0_dir_name,
-                                                 tree_node, level0_dir_name + "/")
-                                        )
+                    if d not in tree_node.dirs:
+                        # not first directory
+                        if len(tree_node.dirs) > 0:
+                            if i == 1:
+                                if len(tree_node.dirs) == 1:
+                                    self._file_structures[self._current_parent].append(
+                                            MetaInfo(0, True, level0_dir_name,
+                                                     tree_node, level0_dir_name + "/")
+                                            )
 
-                            dir_name, node = tree_node.dirs.last_key_value()
-                            self.buildFileStructure(1, dir_name, node,
-                                                    "{}/{}/".format(level0_dir_name, dir_name))
-                        elif i == 0:
-                            self.appendRemainingFiles(tree_node)
+                                dir_name, node = tree_node.dirs.last_key_value()
+                                self.buildFileStructure(1, dir_name, node,
+                                                        "{}/{}/".format(level0_dir_name, dir_name))
+                            elif i == 0:
+                                self.appendRemainingFiles(tree_node)
 
-                    if len(self._file_structures[self._current_parent]) >= self._preopen_num:
-                        status = FolderStatus.CLOSED
-                    else:
-                        status = FolderStatus.OPEN
-                    tree_node.dirs[d] = TreeNode(status)
+                        if len(self._file_structures[self._current_parent]) >= self._preopen_num:
+                            status = FolderStatus.CLOSED
+                        else:
+                            status = FolderStatus.OPEN
+                        tree_node.dirs[d] = TreeNode(status)
 
-                tree_node = tree_node.dirs[d]
+                    tree_node = tree_node.dirs[d]
 
             if mode != "160000":
                 tree_node.files[file] = source
@@ -725,12 +734,14 @@ class TreeView(GitCommandView):
             if added == "-" and deleted == "-":
                 self._num_stat[parent][pathname] = "(Bin)"
             else:
-                self._num_stat[parent][pathname] = "+{} -{}".format(added, deleted)
+                self._num_stat[parent][pathname] = "+{:3} -{}".format(added, deleted)
 
-    def expandFolder(self, line_num):
-        pass
+    def expandFolder(self, index):
+        with self._lock:
+            meta_info = self._file_structures[self._current_parent][index]
+            pass
 
-    def collapseFolder(self, line_num):
+    def collapseFolder(self, index):
         pass
 
     def findFile(self, path):
@@ -761,6 +772,16 @@ class TreeView(GitCommandView):
                                           info.name,
                                           num_stat
                                           )
+
+    def setOptions(self, bufhidden):
+        super(TreeView, self).setOptions(bufhidden)
+        lfCmd("call win_execute({}, 'setlocal cursorline')".format(self._window_id))
+        lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
+        try:
+            lfCmd(r"call win_execute({}, 'setlocal list lcs=leadmultispace:¦\ ,tab:\ \ ')"
+                  .format(self._window_id))
+        except vim.error:
+            lfCmd("call win_execute({}, 'setlocal nolist')".format(self._window_id))
 
     def writeBuffer(self):
         if self._current_parent is None:
