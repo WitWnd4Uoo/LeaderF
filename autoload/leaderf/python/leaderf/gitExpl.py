@@ -779,16 +779,18 @@ class TreeView(GitCommandView):
             meta_info = structure[index]
             if meta_info.is_dir:
                 if meta_info.info.status == FolderStatus.CLOSED:
-                    self.expandFolder(line_num, index, meta_info, meta_info.info, recursive)
+                    self.expandFolder(line_num, index, meta_info, recursive)
                 else:
-                    pass
+                    self.collapseFolder(line_num, index, meta_info, recursive)
             else:
                 pass
 
-    def expandFolder(self, line_num, index, meta_info, tree_node, recursive):
+    def expandFolder(self, line_num, index, meta_info, recursive):
         structure = self._file_structures[self._current_parent]
         size = len(structure)
-        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, tree_node, recursive)
+        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info,
+                                                                  meta_info.info,
+                                                                  recursive)
         self._buffer.options['modifiable'] = True
         try:
             increment = len(structure) - size
@@ -800,8 +802,23 @@ class TreeView(GitCommandView):
         finally:
             self._buffer.options['modifiable'] = False
 
-    def collapseFolder(self, index):
-        pass
+    def collapseFolder(self, line_num, index, meta_info, recursive):
+        meta_info.info.status = FolderStatus.CLOSED
+
+        structure = self._file_structures[self._current_parent]
+        tree_node = meta_info.info
+        if len(tree_node.dirs) == 0:
+            decrement = len(tree_node.files)
+            del structure[index + 1 : index + 1 + decrement]
+            self._buffer.options['modifiable'] = True
+            try:
+                self._buffer[line_num - 1] = self.buildLine(structure[index])
+                del self._buffer[line_num:line_num + decrement]
+                self._offset_in_content -= decrement
+            finally:
+                self._buffer.options['modifiable'] = False
+        else:
+            pass
 
     def findFile(self, path):
         pass
