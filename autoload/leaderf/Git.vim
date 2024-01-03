@@ -48,7 +48,8 @@ endfunction
 function! leaderf#Git#TreeViewMaps(id)
     exec g:Lf_py "import ctypes"
     let tree_view = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
-    exec printf('nnoremap <buffer> <silent> o             :exec g:Lf_py "%s.expandOrCollapseFolder()"<CR>', tree_view)
+    exec printf('nnoremap <buffer> <silent> o             :exec g:Lf_py "%s.expandOrCollapseFolder(False)"<CR>', tree_view)
+    exec printf('nnoremap <buffer> <silent> O             :exec g:Lf_py "%s.expandOrCollapseFolder(True)"<CR>', tree_view)
 endfunction
 
 function! leaderf#Git#TimerCallback(manager_id, id)

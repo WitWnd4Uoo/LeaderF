@@ -748,27 +748,27 @@ class TreeView(GitCommandView):
             else:
                 self._num_stat[parent][pathname] = "+{:3} -{}".format(added, deleted)
 
-    def metaInfoGenerator(self, meta_info, tree_node):
+    def metaInfoGenerator(self, meta_info, tree_node, recursive):
         meta_info.info.status = FolderStatus.OPEN
 
         if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
             dir_name, node = tree_node.dirs.last_key_value()
             meta_info.name = "{}/{}".format(meta_info.name, dir_name)
             meta_info.path = "{}{}/".format(meta_info.path, dir_name)
-            yield from self.metaInfoGenerator(meta_info, node)
+            yield from self.metaInfoGenerator(meta_info, node, recursive)
             return
 
         for dir_name, node in tree_node.dirs.items():
             cur_path = "{}{}/".format(meta_info.path, dir_name)
             info = MetaInfo(meta_info.level + 1, True, dir_name, node, cur_path)
             yield info
-            if node.status == FolderStatus.OPEN:
-                yield from metaInfoGenerator(info, node)
+            if recursive == True or node.status == FolderStatus.OPEN:
+                yield from self.metaInfoGenerator(info, node, recursive)
 
         for k, v in tree_node.files.items():
             yield MetaInfo(meta_info.level + 1, False, k, v, v[3] if v[4] == "" else v[4])
 
-    def expandOrCollapseFolder(self):
+    def expandOrCollapseFolder(self, recursive=False):
         with self._lock:
             line_num = vim.current.window.cursor[0]
             index = line_num - len(self._head) - 1
@@ -779,16 +779,16 @@ class TreeView(GitCommandView):
             meta_info = structure[index]
             if meta_info.is_dir:
                 if meta_info.info.status == FolderStatus.CLOSED:
-                    self.expandFolder(line_num, index, meta_info, meta_info.info)
+                    self.expandFolder(line_num, index, meta_info, meta_info.info, recursive)
                 else:
                     pass
             else:
                 pass
 
-    def expandFolder(self, line_num, index, meta_info, tree_node):
+    def expandFolder(self, line_num, index, meta_info, tree_node, recursive):
         structure = self._file_structures[self._current_parent]
         size = len(structure)
-        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, tree_node)
+        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, tree_node, recursive)
         self._buffer.options['modifiable'] = True
         try:
             increment = len(structure) - size
