@@ -361,7 +361,6 @@ class GitCommandView(object):
         lfCmd("call win_execute({}, 'setlocal noswapfile')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal nospell')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal nomodifiable')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal nofoldenable')".format(self._window_id))
         lfCmd("call win_execute({}, '{}')".format(self._window_id, self._cmd.getFileTypeCommand()))
 
     def initBuffer(self):
@@ -749,24 +748,25 @@ class TreeView(GitCommandView):
             else:
                 self._num_stat[parent][pathname] = "+{:3} -{}".format(added, deleted)
 
-    def metaInfoGenerator(self, level, name, tree_node, path):
-        tree_node.status = FolderStatus.OPEN
-        print(name, path)
+    def metaInfoGenerator(self, meta_info, tree_node):
+        meta_info.info.status = FolderStatus.OPEN
 
         if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
             dir_name, node = tree_node.dirs.last_key_value()
-            yield from self.metaInfoGenerator(level, "{}/{}".format(name, dir_name),
-                                              node, "{}{}/".format(path, dir_name))
+            meta_info.name = "{}/{}".format(meta_info.name, dir_name)
+            meta_info.path = "{}{}/".format(meta_info.path, dir_name)
+            yield from self.metaInfoGenerator(meta_info, node)
             return
 
         for dir_name, node in tree_node.dirs.items():
-            cur_path = "{}{}/".format(path, dir_name)
-            yield MetaInfo(level + 1, True, dir_name, node, cur_path)
+            cur_path = "{}{}/".format(meta_info.path, dir_name)
+            info = MetaInfo(meta_info.level + 1, True, dir_name, node, cur_path)
+            yield info
             if node.status == FolderStatus.OPEN:
-                yield from metaInfoGenerator(level + 1, dir_name, node, cur_path)
+                yield from metaInfoGenerator(info, node)
 
         for k, v in tree_node.files.items():
-            yield MetaInfo(level + 1, False, k, v, v[3] if v[4] == "" else v[4])
+            yield MetaInfo(meta_info.level + 1, False, k, v, v[3] if v[4] == "" else v[4])
 
     def expandOrCollapseFolder(self):
         with self._lock:
@@ -779,22 +779,24 @@ class TreeView(GitCommandView):
             meta_info = structure[index]
             if meta_info.is_dir:
                 if meta_info.info.status == FolderStatus.CLOSED:
-                    self.expandFolder(line_num, index, meta_info.level,
-                                      meta_info.name, meta_info.info, meta_info.path)
+                    self.expandFolder(line_num, index, meta_info, meta_info.info)
                 else:
                     pass
             else:
                 pass
 
-    def expandFolder(self, line_num, index, level, name, tree_node, path):
+    def expandFolder(self, line_num, index, meta_info, tree_node):
         structure = self._file_structures[self._current_parent]
         size = len(structure)
-        structure[index + 1 : index + 1] = self.metaInfoGenerator(level, name, tree_node, path)
+        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, tree_node)
         self._buffer.options['modifiable'] = True
         try:
+            increment = len(structure) - size
+            self._buffer[line_num - 1] = self.buildLine(structure[index])
             self._buffer.append([self.buildLine(info)
-                                 for info in structure[index + 1 : index + 1 + len(structure) - size]],
+                                 for info in structure[index + 1 : index + 1 + increment]],
                                 line_num)
+            self._offset_in_content += increment
         finally:
             self._buffer.options['modifiable'] = False
 
@@ -835,6 +837,7 @@ class TreeView(GitCommandView):
         lfCmd(r"call win_execute({}, 'setlocal stl=\ {}')".format(self._window_id, self._project_root + "/"))
         lfCmd("call win_execute({}, 'setlocal cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
         try:
             lfCmd(r"call win_execute({}, 'setlocal list lcs=leadmultispace:¦\ ,tab:\ \ ')"
                   .format(self._window_id))
@@ -859,18 +862,19 @@ class TreeView(GitCommandView):
             self.stopTimer()
             return
 
-        self._buffer.options['modifiable'] = True
-        try:
-            structure = self._file_structures[self._current_parent]
-            cur_len = len(structure)
-            if cur_len > self._offset_in_content:
-                self._buffer.append([self.buildLine(info)
-                                     for info in structure[self._offset_in_content:cur_len]])
+        with self._lock:
+            self._buffer.options['modifiable'] = True
+            try:
+                structure = self._file_structures[self._current_parent]
+                cur_len = len(structure)
+                if cur_len > self._offset_in_content:
+                    self._buffer.append([self.buildLine(info)
+                                         for info in structure[self._offset_in_content:cur_len]])
 
-                self._offset_in_content = cur_len
-                lfCmd("redraw")
-        finally:
-            self._buffer.options['modifiable'] = False
+                    self._offset_in_content = cur_len
+                    lfCmd("redraw")
+            finally:
+                self._buffer.options['modifiable'] = False
 
         if self._read_finished == 1 and self._offset_in_content == len(structure):
             self._read_finished = 2
