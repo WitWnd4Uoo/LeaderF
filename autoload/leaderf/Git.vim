@@ -45,6 +45,12 @@ function! leaderf#Git#SpecificMaps(id)
     exec printf('nnoremap <buffer> <silent> e             :exec g:Lf_py "%s.editCommand()"<CR>', manager)
 endfunction
 
+function! leaderf#Git#TreeViewMaps(id)
+    exec g:Lf_py "import ctypes"
+    let tree_view = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
+    exec printf('nnoremap <buffer> <silent> o             :exec g:Lf_py "%s.expandOrCollapseFolder()"<CR>', tree_view)
+endfunction
+
 function! leaderf#Git#TimerCallback(manager_id, id)
     exec g:Lf_py "import ctypes"
     exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value._callback(bang=True)", a:manager_id)

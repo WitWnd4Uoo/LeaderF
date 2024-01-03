@@ -367,6 +367,9 @@ class GitCommandView(object):
     def initBuffer(self):
         pass
 
+    def defineMaps(self, winid):
+        pass
+
     def create(self, bufhidden='wipe', buf_content=None):
         if self._buffer is not None:
             self._buffer.options['modifiable'] = True
@@ -378,6 +381,7 @@ class GitCommandView(object):
         self.init()
 
         if self._buffer is None:
+            self.defineMaps(self._window_id)
             self.setOptions(bufhidden)
             if bufhidden == 'wipe':
                 lfCmd("augroup Lf_Git | augroup END")
@@ -526,7 +530,7 @@ class TreeView(GitCommandView):
         folder_icons = lfEval("g:Lf_GitFolderIcons")
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
-        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100)"))
+        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 0)"))
         self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    #  
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
         self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    #  
@@ -539,6 +543,10 @@ class TreeView(GitCommandView):
                 "M": self._modification_icon,
                 "R": self._rename_icon,
                 }
+        self._head = [
+                '" Press <F1> for help',
+                '',
+                ]
         self._match_ids = []
         self.enableColor()
 
@@ -583,6 +591,10 @@ class TreeView(GitCommandView):
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
+
+    def defineMaps(self, winid):
+        lfCmd("call win_execute({}, 'call leaderf#Git#TreeViewMaps({})')"
+              .format(self._window_id, id(self)))
 
     def generateSource(self, line):
         """
@@ -737,10 +749,54 @@ class TreeView(GitCommandView):
             else:
                 self._num_stat[parent][pathname] = "+{:3} -{}".format(added, deleted)
 
-    def expandFolder(self, index):
+    def metaInfoGenerator(self, level, name, tree_node, path):
+        tree_node.status = FolderStatus.OPEN
+        print(name, path)
+
+        if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
+            dir_name, node = tree_node.dirs.last_key_value()
+            yield from self.metaInfoGenerator(level, "{}/{}".format(name, dir_name),
+                                              node, "{}{}/".format(path, dir_name))
+            return
+
+        for dir_name, node in tree_node.dirs.items():
+            cur_path = "{}{}/".format(path, dir_name)
+            yield MetaInfo(level + 1, True, dir_name, node, cur_path)
+            if node.status == FolderStatus.OPEN:
+                yield from metaInfoGenerator(level + 1, dir_name, node, cur_path)
+
+        for k, v in tree_node.files.items():
+            yield MetaInfo(level + 1, False, k, v, v[3] if v[4] == "" else v[4])
+
+    def expandOrCollapseFolder(self):
         with self._lock:
-            meta_info = self._file_structures[self._current_parent][index]
-            pass
+            line_num = vim.current.window.cursor[0]
+            index = line_num - len(self._head) - 1
+            structure = self._file_structures[self._current_parent]
+            if index < 0 or index >= len(structure):
+                return
+
+            meta_info = structure[index]
+            if meta_info.is_dir:
+                if meta_info.info.status == FolderStatus.CLOSED:
+                    self.expandFolder(line_num, index, meta_info.level,
+                                      meta_info.name, meta_info.info, meta_info.path)
+                else:
+                    pass
+            else:
+                pass
+
+    def expandFolder(self, line_num, index, level, name, tree_node, path):
+        structure = self._file_structures[self._current_parent]
+        size = len(structure)
+        structure[index + 1 : index + 1] = self.metaInfoGenerator(level, name, tree_node, path)
+        self._buffer.options['modifiable'] = True
+        try:
+            self._buffer.append([self.buildLine(info)
+                                 for info in structure[index + 1 : index + 1 + len(structure) - size]],
+                                line_num)
+        finally:
+            self._buffer.options['modifiable'] = False
 
     def collapseFolder(self, index):
         pass
@@ -776,7 +832,7 @@ class TreeView(GitCommandView):
 
     def setOptions(self, bufhidden):
         super(TreeView, self).setOptions(bufhidden)
-        lfCmd("call win_execute({}, 'setlocal stl={}')".format(self._window_id, self._project_root + "/"))
+        lfCmd(r"call win_execute({}, 'setlocal stl=\ {}')".format(self._window_id, self._project_root + "/"))
         lfCmd("call win_execute({}, 'setlocal cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         try:
@@ -788,10 +844,7 @@ class TreeView(GitCommandView):
     def initBuffer(self):
         self._buffer.options['modifiable'] = True
         try:
-            self._buffer[:] = [
-                    '" Press <F1> for help',
-                    '',
-                    ]
+            self._buffer[:] = self._head
         finally:
             self._buffer.options['modifiable'] = False
 
