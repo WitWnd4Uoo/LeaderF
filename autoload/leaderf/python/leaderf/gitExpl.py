@@ -852,7 +852,8 @@ class TreeView(GitCommandView):
 
     def setOptions(self, bufhidden):
         super(TreeView, self).setOptions(bufhidden)
-        lfCmd(r"call win_execute({}, 'setlocal stl=\ {}')".format(self._window_id, self._project_root + "/"))
+        lfCmd(r"call win_execute({}, 'setlocal stl=\ {}')"
+              .format(self._window_id, self._project_root + "/"))
         lfCmd("call win_execute({}, 'setlocal cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
@@ -1007,7 +1008,8 @@ class PreviewPanel(Panel):
     def create(self, cmd, config):
         if lfEval("has('nvim')") == '1':
             lfCmd("noautocmd let scratch_buffer = nvim_create_buf(0, 1)")
-            self._preview_winid = int(lfEval("nvim_open_win(scratch_buffer, 0, %s)" % json.dumps(config)))
+            self._preview_winid = int(lfEval("nvim_open_win(scratch_buffer, 0, %s)"
+                                             % json.dumps(config)))
         else:
             lfCmd("noautocmd silent! let winid = popup_create([], %s)" % json.dumps(config))
             self._preview_winid = int(lfEval("winid"))
@@ -1332,9 +1334,11 @@ class GitExplManager(Manager):
             lfCmd("noautocmd call nvim_buf_set_option(scratch_buffer, 'bufhidden', 'wipe')")
             lfCmd("noautocmd call nvim_buf_set_option(scratch_buffer, 'undolevels', -1)")
 
-            self._preview_winid = int(lfEval("nvim_open_win(scratch_buffer, 0, {})".format(json.dumps(config))))
+            self._preview_winid = int(lfEval("nvim_open_win(scratch_buffer, 0, {})"
+                                             .format(json.dumps(config))))
         else:
-            lfCmd("noautocmd let winid = popup_create('{}', {})".format(escQuote(source), json.dumps(config)))
+            lfCmd("noautocmd let winid = popup_create('{}', {})"
+                  .format(escQuote(source), json.dumps(config)))
             self._preview_winid = int(lfEval("winid"))
 
         self._setWinOptions(self._preview_winid)
@@ -1349,7 +1353,8 @@ class GitExplManager(Manager):
             lfCmd("""call win_execute({}, "call nvim_buf_set_lines(0, 0, -1, v:false, ['{}'])")"""
                   .format(self._preview_winid, escQuote(source)))
         else:
-            lfCmd("noautocmd call popup_settext({}, '{}')".format(self._preview_winid, escQuote(source)))
+            lfCmd("noautocmd call popup_settext({}, '{}')"
+                  .format(self._preview_winid, escQuote(source)))
 
     def _cmdExtension(self, cmd):
         if type(self) is GitExplManager:
@@ -1478,7 +1483,8 @@ class GitDiffExplManager(GitExplManager):
 
             tabpage_count = len(vim.tabpages)
 
-            self._result_panel.create(self.createGitCommand(self._arguments, source), self._selected_content)
+            self._result_panel.create(self.createGitCommand(self._arguments, source),
+                                      self._selected_content)
 
             if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
                 tabmove()
@@ -1576,7 +1582,8 @@ class GitLogExplManager(GitExplManager):
 
             tabpage_count = len(vim.tabpages)
 
-            self._result_panel.create(self.createGitCommand(self._arguments, source), self._selected_content)
+            self._result_panel.create(self.createGitCommand(self._arguments, source),
+                                      self._selected_content)
 
             if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
                 tabmove()
