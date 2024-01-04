@@ -863,7 +863,8 @@ class TreeView(GitCommandView):
         super(TreeView, self).setOptions(bufhidden)
         lfCmd(r"call win_execute({}, 'setlocal stl=\ {}')"
               .format(self._window_id, self._project_root + "/"))
-        lfCmd("call win_execute({}, 'setlocal cursorline')".format(self._window_id))
+        # 'setlocal cursorline' does not take effect on neovim
+        lfCmd("call win_execute({}, 'set cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
         try:
