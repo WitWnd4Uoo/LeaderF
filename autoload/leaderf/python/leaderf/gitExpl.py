@@ -6,11 +6,10 @@ import re
 import os
 import os.path
 import json
+import bisect
 import itertools
 from enum import Enum
-from functools import wraps
 from collections import OrderedDict
-from collections import deque
 from .utils import *
 from .explorer import *
 from .manager import *
@@ -807,18 +806,22 @@ class TreeView(GitCommandView):
 
         structure = self._file_structures[self._current_parent]
         tree_node = meta_info.info
-        if len(tree_node.dirs) == 0:
-            decrement = len(tree_node.files)
-            del structure[index + 1 : index + 1 + decrement]
-            self._buffer.options['modifiable'] = True
-            try:
-                self._buffer[line_num - 1] = self.buildLine(structure[index])
-                del self._buffer[line_num:line_num + decrement]
-                self._offset_in_content -= decrement
-            finally:
-                self._buffer.options['modifiable'] = False
+        children_num = len(tree_node.dirs) + len(tree_node.files)
+        if not structure[index + children_num + 1].path.startswith(meta_info.path):
+            decrement = children_num
         else:
-            pass
+            pos = bisect.bisect_right(structure, False, lo=index + children_num + 1,
+                                        key=lambda info: not info.path.startswith(meta_info.path))
+            decrement = pos - 1 - index
+
+        del structure[index + 1 : index + 1 + decrement]
+        self._buffer.options['modifiable'] = True
+        try:
+            self._buffer[line_num - 1] = self.buildLine(structure[index])
+            del self._buffer[line_num:line_num + decrement]
+            self._offset_in_content -= decrement
+        finally:
+            self._buffer.options['modifiable'] = False
 
     def findFile(self, path):
         pass
