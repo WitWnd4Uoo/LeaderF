@@ -544,48 +544,53 @@ class TreeView(GitCommandView):
         self._head = [
                 '" Press <F1> for help',
                 '',
+                self._project_root + "/",
                 ]
         self._match_ids = []
         self.enableColor()
 
     def enableColor(self):
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolder'', ''\S*/'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitHelp'', ''^".*'', 0)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolderIcon'', ''^\s*\zs[{}{}]'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolder'', ''\S*/'', 0)')"""
+              .format(self._window_id))
+        id = int(lfEval("matchid"))
+        self._match_ids.append(id)
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolderIcon'', ''^\s*\zs[{}{}]'', 0)')"""
               .format(self._window_id, self._closed_folder_icon, self._open_folder_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitAddIcon'', ''^\s*\zs{}'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitAddIcon'', ''^\s*\zs{}'', 0)')"""
               .format(self._window_id, self._add_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitCopyIcon'', ''^\s*\zs{}'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitCopyIcon'', ''^\s*\zs{}'', 0)')"""
               .format(self._window_id, self._copy_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitDelIcon'', ''^\s*\zs{}'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitDelIcon'', ''^\s*\zs{}'', 0)')"""
               .format(self._window_id, self._del_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitModificationIcon'', ''^\s*\zs{}'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitModificationIcon'', ''^\s*\zs{}'', 0)')"""
               .format(self._window_id, self._modification_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', ''^\s*\zs{}'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', ''^\s*\zs{}'', 0)')"""
               .format(self._window_id, self._rename_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatAdd'', ''\t\zs+\d\+'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatAdd'', ''\t\zs+\d\+'', 0)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatDel'', ''\t+\d\+\s\+\zs-\d\+'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatDel'', ''\t+\d\+\s\+\zs-\d\+'', 0)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatBinary'', ''\t\zs(Bin)'', 10)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatBinary'', ''\t\zs(Bin)'', 0)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
@@ -867,6 +872,8 @@ class TreeView(GitCommandView):
         lfCmd("call win_execute({}, 'set cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal nonumber')".format(self._window_id))
         try:
             lfCmd(r"call win_execute({}, 'setlocal list lcs=leadmultispace:¦\ ,tab:\ \ ')"
                   .format(self._window_id))
