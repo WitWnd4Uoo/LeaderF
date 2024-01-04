@@ -748,14 +748,16 @@ class TreeView(GitCommandView):
             else:
                 self._num_stat[parent][pathname] = "+{:3} -{}".format(added, deleted)
 
-    def metaInfoGenerator(self, meta_info, tree_node, recursive):
+    def metaInfoGenerator(self, meta_info, recursive):
         meta_info.info.status = FolderStatus.OPEN
 
+        tree_node = meta_info.info
         if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
             dir_name, node = tree_node.dirs.last_key_value()
             meta_info.name = "{}/{}".format(meta_info.name, dir_name)
             meta_info.path = "{}{}/".format(meta_info.path, dir_name)
-            yield from self.metaInfoGenerator(meta_info, node, recursive)
+            meta_info.info = node
+            yield from self.metaInfoGenerator(meta_info, recursive)
             return
 
         for dir_name, node in tree_node.dirs.items():
@@ -763,7 +765,7 @@ class TreeView(GitCommandView):
             info = MetaInfo(meta_info.level + 1, True, dir_name, node, cur_path)
             yield info
             if recursive == True or node.status == FolderStatus.OPEN:
-                yield from self.metaInfoGenerator(info, node, recursive)
+                yield from self.metaInfoGenerator(info, recursive)
 
         for k, v in tree_node.files.items():
             yield MetaInfo(meta_info.level + 1, False, k, v, v[3] if v[4] == "" else v[4])
@@ -788,9 +790,7 @@ class TreeView(GitCommandView):
     def expandFolder(self, line_num, index, meta_info, recursive):
         structure = self._file_structures[self._current_parent]
         size = len(structure)
-        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info,
-                                                                  meta_info.info,
-                                                                  recursive)
+        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, recursive)
         self._buffer.options['modifiable'] = True
         try:
             increment = len(structure) - size
