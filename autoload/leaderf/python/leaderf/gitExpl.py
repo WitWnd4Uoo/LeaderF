@@ -826,29 +826,27 @@ class TreeView(GitCommandView):
     def findFile(self, path):
         pass
 
-    def buildLine(self, info):
-        """
-        info is MetaInfo
-        """
-        if info.is_dir:
-            if info.info.status == FolderStatus.CLOSED:
+    def buildLine(self, meta_info):
+        if meta_info.is_dir:
+            if meta_info.info.status == FolderStatus.CLOSED:
                 icon = self._closed_folder_icon
             else:
                 icon = self._open_folder_icon
-            return "{}{} {}/".format("  " * info.level, icon, info.name)
+            return "{}{} {}/".format("  " * meta_info.level, icon, meta_info.name)
         else:
-            num_stat = self._num_stat.get(self._current_parent, {}).get(info.path, "")
-            icon = self._status_icons.get(info.info[2][0], self._modification_icon)
+            num_stat = self._num_stat.get(self._current_parent, {}).get(meta_info.path, "")
+            icon = self._status_icons.get(meta_info.info[2][0], self._modification_icon)
 
             orig_name = ""
-            if info.info[2][0] in ("R", "C"):
-                head, tail = os.path.split(info.info[3])
-                orig_name = "{} => ".format(os.path.relpath(info.info[3], os.path.dirname(info.info[4])))
+            if meta_info.info[2][0] in ("R", "C"):
+                head, tail = os.path.split(meta_info.info[3])
+                orig_name = "{} => ".format(os.path.relpath(meta_info.info[3],
+                                                            os.path.dirname(meta_info.info[4])))
 
-            return "{}{} {}{}\t{}".format("  " * info.level,
+            return "{}{} {}{}\t{}".format("  " * meta_info.level,
                                           icon,
                                           orig_name,
-                                          info.name,
+                                          meta_info.name,
                                           num_stat
                                           )
 
