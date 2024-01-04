@@ -803,15 +803,24 @@ class TreeView(GitCommandView):
 
     def collapseFolder(self, line_num, index, meta_info, recursive):
         meta_info.info.status = FolderStatus.CLOSED
+        if "/" in meta_info.name:
+            prefix = meta_info.path[:len(meta_info.path) - len(meta_info.name) - 2]
+            tree_node = self._trees[self._current_parent]
+            for d in prefix.split("/"):
+                tree_node = tree_node.dirs[d]
+
+            for d in meta_info.name.split("/"):
+                tree_node = tree_node.dirs[d]
+                tree_node.status = FolderStatus.CLOSED
 
         structure = self._file_structures[self._current_parent]
-        tree_node = meta_info.info
-        children_num = len(tree_node.dirs) + len(tree_node.files)
+        cur_node = meta_info.info
+        children_num = len(cur_node.dirs) + len(cur_node.files)
         if not structure[index + children_num + 1].path.startswith(meta_info.path):
             decrement = children_num
         else:
             pos = bisect.bisect_right(structure, False, lo=index + children_num + 1,
-                                        key=lambda info: not info.path.startswith(meta_info.path))
+                                      key=lambda info: not info.path.startswith(meta_info.path))
             decrement = pos - 1 - index
 
         del structure[index + 1 : index + 1 + decrement]
