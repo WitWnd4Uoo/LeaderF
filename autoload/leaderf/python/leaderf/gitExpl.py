@@ -539,7 +539,7 @@ class TreeView(GitCommandView):
         folder_icons = lfEval("g:Lf_GitFolderIcons")
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
-        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 0)"))
+        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100*100000)"))
         self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    #  
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
         self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    #  
@@ -862,8 +862,36 @@ class TreeView(GitCommandView):
         finally:
             self._buffer.options['modifiable'] = False
 
-    def findFile(self, path):
-        pass
+    def locateFile(self, path):
+        # for test
+        path = lfRelpath(vim.current.buffer.name)
+
+
+
+        with self._lock:
+            self._locateFile(path)
+
+    def _locateFile(self, path):
+        def getKey(info):
+            if info.path == path:
+                return 0
+            elif ((info.path > path
+                  and not os.path.dirname(info.path).startswith(os.path.dirname(path) + "/"))
+                  or
+                  (info.is_dir == False
+                  and os.path.dirname(path).startswith(os.path.dirname(info.path) + "/"))):
+                return 1
+            else:
+                return -1
+
+        structure = self._file_structures[self._current_parent]
+        index = bisect.bisect_left(structure, 0, key=getKey)
+        if structure[index].path == path:
+            lfCmd("call win_execute({}, '{} | norm! zz')"
+                  .format(self._window_id, index + 1 + len(self._head)))
+        else:
+            pass
+
 
     def buildLine(self, meta_info):
         if meta_info.is_dir:
@@ -897,6 +925,7 @@ class TreeView(GitCommandView):
         lfCmd("call win_execute({}, 'set cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal foldmethod=indent')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal conceallevel=0')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal nonumber')".format(self._window_id))
