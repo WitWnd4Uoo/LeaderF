@@ -4,6 +4,7 @@
 import vim
 import re
 import os
+import sys
 import os.path
 import json
 import bisect
@@ -511,6 +512,16 @@ class MetaInfo(object):
         self.info = info
         self.path = path
 
+class KeyWrapper(object):
+    def __init__(self, iterable, key):
+        self._list = iterable
+        self._key = key
+
+    def __getitem__(self, i):
+        return self._key(self._list[i])
+
+    def __len__(self):
+        return len(self._list)
 
 class TreeView(GitCommandView):
     def __init__(self, owner, cmd, window_id, project_root):
@@ -550,47 +561,47 @@ class TreeView(GitCommandView):
         self.enableColor()
 
     def enableColor(self):
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitHelp'', ''^".*'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitHelp'', ''^".*'', -100)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolder'', ''\S*/'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolder'', ''\S*/'', -100)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolderIcon'', ''^\s*\zs[{}{}]'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolderIcon'', ''^\s*\zs[{}{}]'', -100)')"""
               .format(self._window_id, self._closed_folder_icon, self._open_folder_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitAddIcon'', ''^\s*\zs{}'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitAddIcon'', ''^\s*\zs{}'', -100)')"""
               .format(self._window_id, self._add_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitCopyIcon'', ''^\s*\zs{}'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitCopyIcon'', ''^\s*\zs{}'', -100)')"""
               .format(self._window_id, self._copy_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitDelIcon'', ''^\s*\zs{}'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitDelIcon'', ''^\s*\zs{}'', -100)')"""
               .format(self._window_id, self._del_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitModificationIcon'', ''^\s*\zs{}'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitModificationIcon'', ''^\s*\zs{}'', -100)')"""
               .format(self._window_id, self._modification_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', ''^\s*\zs{}'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', ''^\s*\zs{}'', -100)')"""
               .format(self._window_id, self._rename_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatAdd'', ''\t\zs+\d\+'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatAdd'', ''\t\zs+\d\+'', -100)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatDel'', ''\t+\d\+\s\+\zs-\d\+'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatDel'', ''\t+\d\+\s\+\zs-\d\+'', -100)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
-        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatBinary'', ''\t\zs(Bin)'', 0)')"""
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatBinary'', ''\t\zs(Bin)'', -100)')"""
               .format(self._window_id))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
@@ -833,8 +844,13 @@ class TreeView(GitCommandView):
         if not structure[index + children_num + 1].path.startswith(meta_info.path):
             decrement = children_num
         else:
-            pos = bisect.bisect_right(structure, False, lo=index + children_num + 1,
-                                      key=lambda info: not info.path.startswith(meta_info.path))
+            if sys.version_info >= (3, 10):
+                pos = bisect.bisect_right(structure, False, lo=index + children_num + 1,
+                                          key=lambda info: not info.path.startswith(meta_info.path))
+            else:
+                pos = bisect.bisect_right(KeyWrapper(structure, lambda info:
+                                                     not info.path.startswith(meta_info.path)),
+                                          False, lo=index + children_num + 1)
             decrement = pos - 1 - index
 
         del structure[index + 1 : index + 1 + decrement]
@@ -882,6 +898,7 @@ class TreeView(GitCommandView):
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal conceallevel=0')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal nonumber')".format(self._window_id))
         try:
             lfCmd(r"call win_execute({}, 'setlocal list lcs=leadmultispace:¦\ ,tab:\ \ ')"
