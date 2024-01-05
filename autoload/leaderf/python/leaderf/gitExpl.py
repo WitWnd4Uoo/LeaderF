@@ -752,16 +752,23 @@ class TreeView(GitCommandView):
             else:
                 self._num_stat[parent][pathname] = "+{:3} -{}".format(added, deleted)
 
-    def metaInfoGenerator(self, meta_info, recursive):
+    def metaInfoGenerator(self, meta_info, recursive, level):
         meta_info.info.status = FolderStatus.OPEN
 
         tree_node = meta_info.info
         if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
-            dir_name, node = tree_node.dirs.last_key_value()
-            meta_info.name = "{}/{}".format(meta_info.name, dir_name)
-            meta_info.path = "{}{}/".format(meta_info.path, dir_name)
-            meta_info.info = node
-            yield from self.metaInfoGenerator(meta_info, recursive)
+            node = tree_node
+            while len(node.dirs) == 1 and len(node.files) == 0:
+                dir_name, node = node.dirs.last_key_value()
+                meta_info.name = "{}/{}".format(meta_info.name, dir_name)
+                meta_info.path = "{}{}/".format(meta_info.path, dir_name)
+                meta_info.info = node
+                if level == 0:
+                    node.status = FolderStatus.OPEN
+
+            if recursive == True or node.status == FolderStatus.OPEN:
+                yield from self.metaInfoGenerator(meta_info, recursive, level + 1)
+
             return
 
         for dir_name, node in tree_node.dirs.items():
@@ -769,7 +776,7 @@ class TreeView(GitCommandView):
             info = MetaInfo(meta_info.level + 1, True, dir_name, node, cur_path)
             yield info
             if recursive == True or node.status == FolderStatus.OPEN:
-                yield from self.metaInfoGenerator(info, recursive)
+                yield from self.metaInfoGenerator(info, recursive, level + 1)
 
         for k, v in tree_node.files.items():
             yield MetaInfo(meta_info.level + 1, False, k, v, v[3] if v[4] == "" else v[4])
@@ -794,7 +801,7 @@ class TreeView(GitCommandView):
     def expandFolder(self, line_num, index, meta_info, recursive):
         structure = self._file_structures[self._current_parent]
         size = len(structure)
-        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, recursive)
+        structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, recursive, 0)
         self._buffer.options['modifiable'] = True
         try:
             increment = len(structure) - size
@@ -808,15 +815,17 @@ class TreeView(GitCommandView):
 
     def collapseFolder(self, line_num, index, meta_info, recursive):
         meta_info.info.status = FolderStatus.CLOSED
-        if "/" in meta_info.name:
-            prefix = meta_info.path[:len(meta_info.path) - len(meta_info.name) - 2]
-            tree_node = self._trees[self._current_parent]
-            for d in prefix.split("/"):
-                tree_node = tree_node.dirs[d]
+        # # Should all the status be set as CLOSED ?
+        # # No.
+        # if "/" in meta_info.name:
+        #     prefix = meta_info.path[:len(meta_info.path) - len(meta_info.name) - 2]
+        #     tree_node = self._trees[self._current_parent]
+        #     for d in prefix.split("/"):
+        #         tree_node = tree_node.dirs[d]
 
-            for d in meta_info.name.split("/"):
-                tree_node = tree_node.dirs[d]
-                tree_node.status = FolderStatus.CLOSED
+        #     for d in meta_info.name.split("/"):
+        #         tree_node = tree_node.dirs[d]
+        #         tree_node.status = FolderStatus.CLOSED
 
         structure = self._file_structures[self._current_parent]
         cur_node = meta_info.info
