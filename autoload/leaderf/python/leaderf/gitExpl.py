@@ -905,10 +905,14 @@ class TreeView(GitCommandView):
 
         structure = self._file_structures[self._cur_parent]
         index = Bisect.bisect_left(structure, 0, key=getKey)
-        if structure[index].path == path:
+        if index < len(structure) and structure[index].path == path:
             lfCmd("call win_gotoid({})" .format(self._window_id))
             lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
         else:
+            # TODO
+            # check whether in structure
+
+
             meta_info = structure[index-1]
             prefix_len = len(meta_info.path)
             tree_node = meta_info.info
@@ -923,9 +927,11 @@ class TreeView(GitCommandView):
             self.expandFolder(line_num, index - 1, meta_info, False)
 
             index = Bisect.bisect_left(structure, 0, key=getKey)
-            if structure[index].path == path:
+            if index < len(structure) and structure[index].path == path:
                 lfCmd("call win_gotoid({})" .format(self._window_id))
                 lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
+            else:
+                lfPrintError("File can't be found!")
 
     def buildLine(self, meta_info):
         if meta_info.is_dir:
