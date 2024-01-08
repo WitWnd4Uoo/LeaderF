@@ -864,7 +864,8 @@ class TreeView(GitCommandView):
         structure = self._file_structures[self._cur_parent]
         cur_node = meta_info.info
         children_num = len(cur_node.dirs) + len(cur_node.files)
-        if not structure[index + children_num + 1].path.startswith(meta_info.path):
+        if (index + children_num + 1 == len(structure)
+            or not structure[index + children_num + 1].path.startswith(meta_info.path)):
             decrement = children_num
         else:
             pos = Bisect.bisect_right(structure, False, lo=index + children_num + 1,
