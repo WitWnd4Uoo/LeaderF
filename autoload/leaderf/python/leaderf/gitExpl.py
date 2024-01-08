@@ -533,13 +533,13 @@ class TreeView(GitCommandView):
         self._file_structures = {}
         # to protect self._file_structures
         self._lock = threading.Lock()
-        self._current_parent = None
+        self._cur_parent = None
         self._short_stat = {}
         self._num_stat = {}
         folder_icons = lfEval("g:Lf_GitFolderIcons")
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
-        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100*100000)"))
+        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 0)"))
         self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    #  
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
         self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    #  
@@ -641,7 +641,7 @@ class TreeView(GitCommandView):
                                     node, "{}{}/".format(path, dir_name)
                                     )
         else:
-            self._file_structures[self._current_parent].append(
+            self._file_structures[self._cur_parent].append(
                     MetaInfo(level, True, name, tree_node, path)
                     )
 
@@ -670,7 +670,7 @@ class TreeView(GitCommandView):
             return
 
         for k, v in tree_node.files.items():
-            self._file_structures[self._current_parent].append(
+            self._file_structures[self._cur_parent].append(
                     MetaInfo(level, False, k, v,
                              v[3] if v[4] == "" else v[4])
                     )
@@ -696,8 +696,8 @@ class TreeView(GitCommandView):
                 parent = "0000000"
             else:
                 parent = parents[size + 1]
-            if self._current_parent is None:
-                self._current_parent = parent
+            if self._cur_parent is None:
+                self._cur_parent = parent
             self._trees[parent] = TreeNode()
             self._file_structures[parent] = []
         elif line.startswith(":"):
@@ -718,7 +718,7 @@ class TreeView(GitCommandView):
                         if len(tree_node.dirs) > 0:
                             if i == 1:
                                 if len(tree_node.dirs) == 1:
-                                    self._file_structures[self._current_parent].append(
+                                    self._file_structures[self._cur_parent].append(
                                             MetaInfo(0, True, level0_dir_name,
                                                      tree_node, level0_dir_name + "/")
                                             )
@@ -729,7 +729,7 @@ class TreeView(GitCommandView):
                             elif i == 0:
                                 self.appendRemainingFiles(tree_node)
 
-                        if len(self._file_structures[self._current_parent]) >= self._preopen_num:
+                        if len(self._file_structures[self._cur_parent]) >= self._preopen_num:
                             status = FolderStatus.CLOSED
                         else:
                             status = FolderStatus.OPEN
@@ -796,7 +796,7 @@ class TreeView(GitCommandView):
         with self._lock:
             line_num = vim.current.window.cursor[0]
             index = line_num - len(self._head) - 1
-            structure = self._file_structures[self._current_parent]
+            structure = self._file_structures[self._cur_parent]
             if index < 0 or index >= len(structure):
                 return
 
@@ -810,7 +810,7 @@ class TreeView(GitCommandView):
                 pass
 
     def expandFolder(self, line_num, index, meta_info, recursive):
-        structure = self._file_structures[self._current_parent]
+        structure = self._file_structures[self._cur_parent]
         size = len(structure)
         structure[index + 1 : index + 1] = self.metaInfoGenerator(meta_info, recursive, 0)
         self._buffer.options['modifiable'] = True
@@ -830,7 +830,7 @@ class TreeView(GitCommandView):
         # # No.
         # if "/" in meta_info.name:
         #     prefix = meta_info.path[:len(meta_info.path) - len(meta_info.name) - 2]
-        #     tree_node = self._trees[self._current_parent]
+        #     tree_node = self._trees[self._cur_parent]
         #     for d in prefix.split("/"):
         #         tree_node = tree_node.dirs[d]
 
@@ -838,7 +838,7 @@ class TreeView(GitCommandView):
         #         tree_node = tree_node.dirs[d]
         #         tree_node.status = FolderStatus.CLOSED
 
-        structure = self._file_structures[self._current_parent]
+        structure = self._file_structures[self._cur_parent]
         cur_node = meta_info.info
         children_num = len(cur_node.dirs) + len(cur_node.files)
         if not structure[index + children_num + 1].path.startswith(meta_info.path):
@@ -884,13 +884,24 @@ class TreeView(GitCommandView):
             else:
                 return -1
 
-        structure = self._file_structures[self._current_parent]
+        structure = self._file_structures[self._cur_parent]
         index = bisect.bisect_left(structure, 0, key=getKey)
         if structure[index].path == path:
             lfCmd("call win_execute({}, '{} | norm! zz')"
                   .format(self._window_id, index + 1 + len(self._head)))
         else:
-            pass
+            meta_info = structure[index-1]
+            prefix_len = len(meta_info.path)
+            tree_node = meta_info.info
+            *directories, file = path[prefix_len:].split("/")
+            node = tree_node
+            node.status = FolderStatus.OPEN
+            for d in directories:
+                node = node.dirs[d]
+                node.status = FolderStatus.OPEN
+
+            line_num = index + len(self._head)
+            self.expandFolder(line_num, index - 1, meta_info, False)
 
 
     def buildLine(self, meta_info):
@@ -901,7 +912,7 @@ class TreeView(GitCommandView):
                 icon = self._open_folder_icon
             return "{}{} {}/".format("  " * meta_info.level, icon, meta_info.name)
         else:
-            num_stat = self._num_stat.get(self._current_parent, {}).get(meta_info.path, "")
+            num_stat = self._num_stat.get(self._cur_parent, {}).get(meta_info.path, "")
             icon = self._status_icons.get(meta_info.info[2][0], self._modification_icon)
 
             orig_name = ""
@@ -943,7 +954,7 @@ class TreeView(GitCommandView):
             self._buffer.options['modifiable'] = False
 
     def writeBuffer(self):
-        if self._current_parent is None:
+        if self._cur_parent is None:
             return
 
         if self._read_finished == 2:
@@ -956,7 +967,7 @@ class TreeView(GitCommandView):
         with self._lock:
             self._buffer.options['modifiable'] = True
             try:
-                structure = self._file_structures[self._current_parent]
+                structure = self._file_structures[self._cur_parent]
                 cur_len = len(structure)
                 if cur_len > self._offset_in_content:
                     self._buffer.append([self.buildLine(info)
