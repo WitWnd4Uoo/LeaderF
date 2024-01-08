@@ -894,20 +894,31 @@ class TreeView(GitCommandView):
         def getKey(info):
             if info.path == path:
                 return 0
-            elif ((info.path > path
-                  and not os.path.dirname(info.path).startswith(os.path.dirname(path) + "/"))
-                  or
-                  (info.is_dir == False
-                  and os.path.dirname(path).startswith(os.path.dirname(info.path) + "/"))):
-                return 1
             else:
-                return -1
+                info_path_dir = os.path.dirname(info.path)
+                path_dir = os.path.dirname(path)
+                if ((info.path > path
+                     and not (info_path_dir.startswith(path_dir) and info_path_dir != path_dir)
+                     )
+                    or
+                    (info.path < path and info.is_dir == False
+                     and (path_dir.startswith(info_path_dir) and info_path_dir != path_dir)
+                     )
+                    ):
+                    return 1
+                else:
+                    return -1
 
         structure = self._file_structures[self._cur_parent]
+        # print(structure[-1].path, getKey(structure[-1]), path)
+        print([getKey(i) for i in structure])
         index = Bisect.bisect_left(structure, 0, key=getKey)
         if index < len(structure) and structure[index].path == path:
-            lfCmd("call win_gotoid({})" .format(self._window_id))
-            lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
+            # lfCmd("call win_gotoid({})" .format(self._window_id))
+            # lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
+            lfCmd("call win_execute({}, '{} | norm! zz')"
+                  .format(self._window_id, index + 1 + len(self._head)))
+            
         else:
             # TODO
             # check whether in structure
@@ -919,6 +930,7 @@ class TreeView(GitCommandView):
             *directories, file = path[prefix_len:].split("/")
             node = tree_node
             node.status = FolderStatus.OPEN
+            print(index, meta_info.path, path, directories)
             for d in directories:
                 node = node.dirs[d]
                 node.status = FolderStatus.OPEN
@@ -928,8 +940,10 @@ class TreeView(GitCommandView):
 
             index = Bisect.bisect_left(structure, 0, key=getKey)
             if index < len(structure) and structure[index].path == path:
-                lfCmd("call win_gotoid({})" .format(self._window_id))
-                lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
+                lfCmd("call win_execute({}, '{} | norm! zz')"
+                      .format(self._window_id, index + 1 + len(self._head)))
+                # lfCmd("call win_gotoid({})" .format(self._window_id))
+                # lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
             else:
                 lfPrintError("File can't be found!")
 
