@@ -847,6 +847,8 @@ class TreeView(GitCommandView):
         finally:
             self._buffer.options['modifiable'] = False
 
+        return increment
+
     def collapseFolder(self, line_num, index, meta_info, recursive):
         meta_info.info.status = FolderStatus.CLOSED
         # # Should all the status be set as CLOSED ?
@@ -910,8 +912,6 @@ class TreeView(GitCommandView):
                     return -1
 
         structure = self._file_structures[self._cur_parent]
-        # print(structure[-1].path, getKey(structure[-1]), path)
-        print([getKey(i) for i in structure])
         index = Bisect.bisect_left(structure, 0, key=getKey)
         if index < len(structure) and structure[index].path == path:
             # lfCmd("call win_gotoid({})" .format(self._window_id))
@@ -930,15 +930,14 @@ class TreeView(GitCommandView):
             *directories, file = path[prefix_len:].split("/")
             node = tree_node
             node.status = FolderStatus.OPEN
-            print(index, meta_info.path, path, directories)
             for d in directories:
                 node = node.dirs[d]
                 node.status = FolderStatus.OPEN
 
             line_num = index + len(self._head)
-            self.expandFolder(line_num, index - 1, meta_info, False)
+            increment = self.expandFolder(line_num, index - 1, meta_info, False)
 
-            index = Bisect.bisect_left(structure, 0, key=getKey)
+            index = Bisect.bisect_left(structure, 0, index, index + increment, key=getKey)
             if index < len(structure) and structure[index].path == path:
                 lfCmd("call win_execute({}, '{} | norm! zz')"
                       .format(self._window_id, index + 1 + len(self._head)))
