@@ -523,6 +523,29 @@ class KeyWrapper(object):
     def __len__(self):
         return len(self._list)
 
+class Bisect(object):
+    @staticmethod
+    def bisect_left(a, x, lo=0, hi=None, *, key=None):
+        if hi is None:
+            hi = len(a)
+
+        if sys.version_info >= (3, 10):
+            pos = bisect.bisect_left(a, x, lo, hi, key=key)
+        else:
+            pos = bisect.bisect_left(KeyWrapper(a, key), x, lo, hi)
+        return pos
+
+    @staticmethod
+    def bisect_right(a, x, lo=0, hi=None, *, key=None):
+        if hi is None:
+            hi = len(a)
+
+        if sys.version_info >= (3, 10):
+            pos = bisect.bisect_right(a, x, lo, hi, key=key)
+        else:
+            pos = bisect.bisect_right(KeyWrapper(a, key), x, lo, hi)
+        return pos
+
 class TreeView(GitCommandView):
     def __init__(self, owner, cmd, window_id, project_root):
         super(TreeView, self).__init__(owner, cmd, window_id)
@@ -844,13 +867,8 @@ class TreeView(GitCommandView):
         if not structure[index + children_num + 1].path.startswith(meta_info.path):
             decrement = children_num
         else:
-            if sys.version_info >= (3, 10):
-                pos = bisect.bisect_right(structure, False, lo=index + children_num + 1,
-                                          key=lambda info: not info.path.startswith(meta_info.path))
-            else:
-                pos = bisect.bisect_right(KeyWrapper(structure, lambda info:
-                                                     not info.path.startswith(meta_info.path)),
-                                          False, lo=index + children_num + 1)
+            pos = Bisect.bisect_right(structure, False, lo=index + children_num + 1,
+                                      key=lambda info: not info.path.startswith(meta_info.path))
             decrement = pos - 1 - index
 
         del structure[index + 1 : index + 1 + decrement]
@@ -885,10 +903,10 @@ class TreeView(GitCommandView):
                 return -1
 
         structure = self._file_structures[self._cur_parent]
-        index = bisect.bisect_left(structure, 0, key=getKey)
+        index = Bisect.bisect_left(structure, 0, key=getKey)
         if structure[index].path == path:
-            lfCmd("call win_execute({}, '{} | norm! zz')"
-                  .format(self._window_id, index + 1 + len(self._head)))
+            lfCmd("call win_gotoid({})" .format(self._window_id))
+            lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
         else:
             meta_info = structure[index-1]
             prefix_len = len(meta_info.path)
@@ -903,6 +921,10 @@ class TreeView(GitCommandView):
             line_num = index + len(self._head)
             self.expandFolder(line_num, index - 1, meta_info, False)
 
+            index = Bisect.bisect_left(structure, 0, key=getKey)
+            if structure[index].path == path:
+                lfCmd("call win_gotoid({})" .format(self._window_id))
+                lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
 
     def buildLine(self, meta_info):
         if meta_info.is_dir:
