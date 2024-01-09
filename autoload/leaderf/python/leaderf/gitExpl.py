@@ -883,8 +883,19 @@ class TreeView(GitCommandView):
         finally:
             self._buffer.options['modifiable'] = False
 
+    def inFileStructure(self, path):
+        *directories, file = path.split("/")
+        tree_node = self._trees[self._cur_parent]
+        for d in directories:
+            if d not in tree_node.dirs:
+                return False
+            tree_node = tree_node.dirs[d]
+
+        return file in tree_node.files
+
     def locateFile(self, path):
         # for test
+        # path = lfRelpath(vim.current.buffer.name, self._project_root)
         path = lfRelpath(vim.current.buffer.name)
 
 
@@ -920,9 +931,9 @@ class TreeView(GitCommandView):
                   .format(self._window_id, index + 1 + len(self._head)))
             
         else:
-            # TODO
-            # check whether in structure
-
+            # if not self.inFileStructure(path):
+            #     lfPrintError("111, File can't be found!")
+            #     return
 
             meta_info = structure[index-1]
             prefix_len = len(meta_info.path)
@@ -938,6 +949,7 @@ class TreeView(GitCommandView):
             increment = self.expandFolder(line_num, index - 1, meta_info, False)
 
             index = Bisect.bisect_left(structure, 0, index, index + increment, key=getKey)
+            print(index, len(structure), structure[index].path, path)
             if index < len(structure) and structure[index].path == path:
                 lfCmd("call win_execute({}, '{} | norm! zz')"
                       .format(self._window_id, index + 1 + len(self._head)))
@@ -960,8 +972,8 @@ class TreeView(GitCommandView):
             orig_name = ""
             if meta_info.info[2][0] in ("R", "C"):
                 head, tail = os.path.split(meta_info.info[3])
-                orig_name = "{} => ".format(os.path.relpath(meta_info.info[3],
-                                                            os.path.dirname(meta_info.info[4])))
+                orig_name = "{} => ".format(lfRelpath(meta_info.info[3],
+                                                      os.path.dirname(meta_info.info[4])))
 
             return "{}{} {}{}\t{}".format("  " * meta_info.level,
                                           icon,
