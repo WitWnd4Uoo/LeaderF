@@ -899,17 +899,26 @@ class TreeView(GitCommandView):
         path = lfRelpath(vim.current.buffer.name)
 
 
-
         with self._lock:
             self._locateFile(path)
+
+    @staticmethod
+    def getDirName(path):
+        if path.endswith("/"):
+            return path
+        else:
+            path = os.path.dirname(path)
+            if path != "":
+                path += "/"
+            return path
 
     def _locateFile(self, path):
         def getKey(info):
             if info.path == path:
                 return 0
             else:
-                info_path_dir = os.path.dirname(info.path)
-                path_dir = os.path.dirname(path)
+                info_path_dir = TreeView.getDirName(info.path)
+                path_dir = TreeView.getDirName(path)
                 if ((info.path > path
                      and not (info_path_dir.startswith(path_dir) and info_path_dir != path_dir)
                      )
@@ -931,9 +940,9 @@ class TreeView(GitCommandView):
                   .format(self._window_id, index + 1 + len(self._head)))
             
         else:
-            # if not self.inFileStructure(path):
-            #     lfPrintError("111, File can't be found!")
-            #     return
+            if not self.inFileStructure(path):
+                lfPrintError("File can't be found!")
+                return
 
             meta_info = structure[index-1]
             prefix_len = len(meta_info.path)
@@ -949,14 +958,13 @@ class TreeView(GitCommandView):
             increment = self.expandFolder(line_num, index - 1, meta_info, False)
 
             index = Bisect.bisect_left(structure, 0, index, index + increment, key=getKey)
-            print(index, len(structure), structure[index].path, path)
             if index < len(structure) and structure[index].path == path:
                 lfCmd("call win_execute({}, '{} | norm! zz')"
                       .format(self._window_id, index + 1 + len(self._head)))
                 # lfCmd("call win_gotoid({})" .format(self._window_id))
                 # lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
             else:
-                lfPrintError("File can't be found!")
+                lfPrintError("BUG: File can't be found!")
 
     def buildLine(self, meta_info):
         if meta_info.is_dir:
