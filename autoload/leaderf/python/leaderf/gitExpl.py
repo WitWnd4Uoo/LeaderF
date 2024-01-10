@@ -678,6 +678,9 @@ class TreeView(GitCommandView):
                 self.appendFiles(level + 1, tree_node)
 
     def appendRemainingFiles(self, tree_node):
+        if len(tree_node.dirs) == 0:
+            return
+
         dir_name, node = tree_node.dirs.last_key_value()
         if len(node.dirs) > 1:
             if node.status == FolderStatus.OPEN:
