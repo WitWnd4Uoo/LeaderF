@@ -1306,15 +1306,20 @@ class ExplorerPage(object):
 
     def _createWindow(self, win_pos, buffer_name):
         if win_pos == 'top':
-            lfCmd("silent! noa keepa keepj abo sp {}".format(buffer_name))
+            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
+            lfCmd("silent! noa keepa keepj abo {}sp {}".format(height, buffer_name))
         elif win_pos == 'bottom':
-            lfCmd("silent! noa keepa keepj bel sp {}".format(buffer_name))
+            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
+            lfCmd("silent! noa keepa keepj bel {}sp {}".format(height, buffer_name))
         elif win_pos == 'left':
-            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
+            lfCmd("silent! noa keepa keepj abo {}vsp {}".format(width, buffer_name))
         elif win_pos == 'right':
-            lfCmd("silent! noa keepa keepj bel vsp {}".format(buffer_name))
-        else:
-            lfCmd("silent! noa keepa keepj abo vsp {}".format(buffer_name))
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
+            lfCmd("silent! noa keepa keepj bel {}vsp {}".format(width, buffer_name))
+        else: # left
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
+            lfCmd("silent! noa keepa keepj abo {}vsp {}".format(width, buffer_name))
 
         return int(lfEval("win_getid()"))
 
@@ -1323,7 +1328,7 @@ class ExplorerPage(object):
         self.tabpage = vim.current.tabpage
 
         cmd = GitLogExplCommand(arguments_dict, source)
-        win_pos = arguments_dict.get("--navigation-position", [""])[0]
+        win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
         winid = self._createWindow(win_pos, cmd.getBufferName())
 
         self._navigation_panel = NavigationPanel()

@@ -225,6 +225,8 @@ let g:Lf_Arguments = {
             \           ],
             \           {"name": ["--position"], "nargs": 1, "choices": ["top", "right", "bottom", "left"], "metavar": "<POSITION>",
             \               "help": "specifies the position of the logs window"},
+            \           {"name": ["--navigation-position"], "nargs": 1, "choices": ["top", "right", "bottom", "left"], "metavar": "<POSITION>",
+            \               "help": "specifies the position of the navigation panel"},
             \       ],
             \       "diff": [
             \           {"name": ["--cached", "--staged"], "nargs": 0, "help": "run 'git diff --cached'"},
