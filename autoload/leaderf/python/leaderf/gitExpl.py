@@ -1006,6 +1006,8 @@ class TreeView(GitCommandView):
         lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal conceallevel=0')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal nonumber')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal winfixwidth')".format(self._window_id))
+        lfCmd("call win_execute({}, 'setlocal winfixheight')".format(self._window_id))
         try:
             lfCmd(r"call win_execute({}, 'setlocal list lcs=leadmultispace:¦\ ,tab:\ \ ')"
                   .format(self._window_id))
