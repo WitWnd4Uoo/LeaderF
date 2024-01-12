@@ -996,8 +996,8 @@ class TreeView(GitCommandView):
 
     def setOptions(self, bufhidden):
         super(TreeView, self).setOptions(bufhidden)
-        lfCmd(r"call win_execute({}, 'setlocal stl=\ {}')"
-              .format(self._window_id, self._project_root + "/"))
+        lfCmd(r"""call win_execute({}, 'let &l:stl=" %#Lf_hl_gitStlFileChanged#0 %##file changed, %#Lf_hl_gitStlAdd#0 (+), %#Lf_hl_gitStlDel#0 (-)"')"""
+              .format(self._window_id))
         # 'setlocal cursorline' does not take effect on neovim
         lfCmd("call win_execute({}, 'set cursorline')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
@@ -1013,6 +1013,9 @@ class TreeView(GitCommandView):
                   .format(self._window_id))
         except vim.error:
             lfCmd("call win_execute({}, 'setlocal nolist')".format(self._window_id))
+        lfCmd("augroup Lf_Git_Colorscheme | augroup END")
+        lfCmd("autocmd Lf_Git_Colorscheme ColorScheme * call leaderf#colorscheme#popup#load('Git', '{}')"
+              .format(lfEval("get(g:, 'Lf_PopupColorscheme', 'default')")))
 
     def initBuffer(self):
         self._buffer.options['modifiable'] = True
@@ -1047,6 +1050,12 @@ class TreeView(GitCommandView):
                 self._buffer.options['modifiable'] = False
 
         if self._read_finished == 1 and self._offset_in_content == len(structure):
+            shortstat = re.sub(r"(\d+)( files? changed)", r"%#Lf_hl_gitStlFileChanged#\1%##\2",
+                               self._short_stat[self._cur_parent])
+            shortstat = re.sub(r"(\d+) insertions?", r"%#Lf_hl_gitStlAdd#\1 ",shortstat)
+            shortstat = re.sub(r"(\d+) deletions?", r"%#Lf_hl_gitStlDel#\1 ", shortstat)
+            lfCmd(r"""call win_execute({}, 'let &l:stl="{}"')"""
+                  .format(self._window_id, shortstat))
             self._read_finished = 2
             self._owner.writeFinished(self._window_id)
             self.stopTimer()

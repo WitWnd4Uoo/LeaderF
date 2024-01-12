@@ -154,6 +154,9 @@ if &background ==? 'dark'
     highlight def link Lf_hl_gitNumStatDel      Lf_hl_gitDiffDeletion
     highlight def link Lf_hl_gitNumStatBinary   Constant
     highlight def link Lf_hl_gitHelp            Comment
+    call leaderf#colorscheme#popup#link_two("Lf_hl_gitStlFileChanged", "StatusLine", "Number", 1)
+    call leaderf#colorscheme#popup#link_two("Lf_hl_gitStlAdd", "StatusLine", "Lf_hl_gitDiffAddition", 1)
+    call leaderf#colorscheme#popup#link_two("Lf_hl_gitStlDel", "StatusLine", "Lf_hl_gitDiffDeletion", 1)
 else
     " Lf_hl_popup_inputText is the wincolor of input window
     highlight def Lf_hl_popup_inputText guifg=#525252 guibg=#f4f3d7 gui=NONE ctermfg=239 ctermbg=230 cterm=NONE
@@ -295,4 +298,7 @@ else
     highlight def link Lf_hl_gitNumStatDel      Lf_hl_gitDiffDeletion
     highlight def link Lf_hl_gitNumStatBinary   Constant
     highlight def link Lf_hl_gitHelp            Comment
+    call leaderf#colorscheme#popup#link_two("Lf_hl_gitStlFileChanged", "StatusLine", "Number", 1)
+    call leaderf#colorscheme#popup#link_two("Lf_hl_gitStlAdd", "StatusLine", "Lf_hl_gitDiffAddition", 1)
+    call leaderf#colorscheme#popup#link_two("Lf_hl_gitStlDel", "StatusLine", "Lf_hl_gitDiffDeletion", 1)
 endif
