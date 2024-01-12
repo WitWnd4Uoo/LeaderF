@@ -100,7 +100,7 @@ class GitDiffExplorer(GitExplorer):
                                          file_names[0], file_names[1])
         icon = webDevIconsGetFileTypeSymbol(file_names[0]) if self._show_icon else ""
         return "{:<4} {}{}{}".format(blob_status[4], icon, file_names[0],
-                                     "" if file_names[1] == "" else "\t->\t" + file_names[1] )
+                                     "" if file_names[1] == "" else "\t=>\t" + file_names[1] )
 
     def getStlCategory(self):
         return 'Git_diff'
@@ -1540,10 +1540,10 @@ class GitDiffExplManager(GitExplManager):
         return a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
         """
         file_name2 = ""
-        if "\t->\t" in line:
-            # 'R050 hello world.txt\t->\thello world2.txt'
-            # 'R050   hello world.txt\t->\thello world2.txt'
-            tmp = line.split("\t->\t")
+        if "\t=>\t" in line:
+            # 'R050 hello world.txt\t=>\thello world2.txt'
+            # 'R050   hello world.txt\t=>\thello world2.txt'
+            tmp = line.split("\t=>\t")
             file_name1 = tmp[0].split(None, 2 if self._show_icon else 1)[-1]
             file_name2 = tmp[1]
         else:
