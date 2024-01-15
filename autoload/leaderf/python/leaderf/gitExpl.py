@@ -1000,12 +1000,12 @@ class TreeView(GitCommandView):
               .format(self._window_id))
         # 'setlocal cursorline' does not take effect on neovim
         lfCmd("call win_execute({}, 'set cursorline')".format(self._window_id))
+        lfCmd("call win_execute({}, 'set nonumber')".format(self._window_id))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal foldmethod=indent')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal conceallevel=0')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal nonumber')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal winfixwidth')".format(self._window_id))
         lfCmd("call win_execute({}, 'setlocal winfixheight')".format(self._window_id))
         try:
@@ -1219,6 +1219,8 @@ class SplitDiffPanel(Panel):
         if name in self._views:
             self._views[name].cleanup()
             del self._views[name]
+            if len(self._views) == 0:
+                self.cleanup()
 
     def cleanup(self):
         self._buffer_contents = {}
