@@ -512,6 +512,7 @@ class MetaInfo(object):
         self.info = info
         self.path = path
 
+
 class KeyWrapper(object):
     def __init__(self, iterable, key):
         self._list = iterable
@@ -522,6 +523,7 @@ class KeyWrapper(object):
 
     def __len__(self):
         return len(self._list)
+
 
 class Bisect(object):
     @staticmethod
@@ -545,6 +547,7 @@ class Bisect(object):
         else:
             pos = bisect.bisect_right(KeyWrapper(a, key), x, lo, hi)
         return pos
+
 
 class TreeView(GitCommandView):
     def __init__(self, owner, cmd, window_id, project_root):
@@ -1206,10 +1209,11 @@ class PreviewPanel(Panel):
             self._view.setContent(content)
 
 
-class SplitDiffPanel(Panel):
+class DiffViewPanel(Panel):
     def __init__(self):
         self._views = {}
         self._buffer_contents = {}
+        self._buffer_names = None
 
     def register(self, view):
         self._views[view.getBufferName()] = view
@@ -1264,6 +1268,8 @@ class SplitDiffPanel(Panel):
                 tabmove()
                 win_ids = [int(lfEval("win_getid({})".format(w.number)))
                            for w in vim.current.tabpage.windows]
+            elif "winid" in kwargs:
+                pass
             else:
                 wins = vim.current.tabpage.windows
                 if (len(wins) == 2
@@ -1308,11 +1314,6 @@ class NavigationPanel(Panel):
             self._tree_view.writeBuffer()
 
 
-class DiffViewPanel(Panel):
-    def __init__(self):
-        pass
-
-
 class ExplorerPage(object):
     def __init__(self, project_root):
         self._project_root = project_root
@@ -1354,8 +1355,8 @@ class ExplorerPage(object):
         if self._navigation_panel is not None:
             self._navigation_panel.cleanup()
 
-        if self._diff_view_panel is not None:
-            self._diff_view_panel.cleanup()
+        # if self._diff_view_panel is not None:
+            # self._diff_view_panel.cleanup()
 
 
 #*****************************************************
@@ -1539,7 +1540,7 @@ class GitExplManager(Manager):
 class GitDiffExplManager(GitExplManager):
     def __init__(self):
         super(GitDiffExplManager, self).__init__()
-        self._split_diff_panel = SplitDiffPanel()
+        self._diff_view_panel = DiffViewPanel()
 
     def _getExplorer(self):
         if self._explorer is None:
@@ -1597,7 +1598,7 @@ class GitDiffExplManager(GitExplManager):
             pass
         else:
             # cleanup the cache when starting
-            self._split_diff_panel.cleanup()
+            self._diff_view_panel.cleanup()
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)
 
     def _afterEnter(self):
@@ -1643,7 +1644,7 @@ class GitDiffExplManager(GitExplManager):
         source = self.getSource(line)
 
         if "-s" in self._arguments:
-            self._split_diff_panel.create(self._arguments, source, **kwargs)
+            self._diff_view_panel.create(self._arguments, source, **kwargs)
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
                 lfCmd("tabnew")
