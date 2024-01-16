@@ -9,6 +9,10 @@ import os.path
 import json
 import bisect
 import itertools
+if sys.version_info >= (3, 0):
+    import queue as Queue
+else:
+    import Queue
 from enum import Enum
 from collections import OrderedDict
 from .utils import *
@@ -562,10 +566,12 @@ class TreeView(GitCommandView):
         self._cur_parent = None
         self._short_stat = {}
         self._num_stat = {}
+        self._first_source = {}
+        self._source_queue = {}
         folder_icons = lfEval("g:Lf_GitFolderIcons")
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
-        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 0)"))
+        self._preopen_num = int(lfEval("get(g:, 'Lf_GitPreopenNum', 100)"))
         self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    #  
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
         self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    #  
@@ -636,6 +642,15 @@ class TreeView(GitCommandView):
         lfCmd("call win_execute({}, 'call leaderf#Git#TreeViewMaps({})')"
               .format(self._window_id, id(self)))
 
+    def getFirstSource(self):
+        if self._first_source.get(self._cur_parent) is not None:
+            return self._first_source[self._cur_parent]
+        else:
+            source = self._source_queue[self._cur_parent].get()
+            self._source_queue[self._cur_parent].task_done()
+            self._first_source[self._cur_parent] = source
+            return source
+
     def generateSource(self, line):
         """
         :000000 100644 000000000 5b01d33aa A    runtime/syntax/json5.vim
@@ -657,30 +672,30 @@ class TreeView(GitCommandView):
                 file_names[0], file_names[1])
                 )
 
-    def buildFileStructure(self, level, name, tree_node, path):
+    def buildFileStructure(self, parent, level, name, tree_node, path):
         if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
             if tree_node.status == FolderStatus.CLOSED:
-                self._file_structures[self._cur_parent].append(
+                self._file_structures[parent].append(
                         MetaInfo(level, True, name, tree_node, path)
                         )
             else:
                 dir_name, node = tree_node.dirs.last_key_value()
-                self.buildFileStructure(level, "{}/{}".format(name, dir_name),
+                self.buildFileStructure(parent, level, "{}/{}".format(name, dir_name),
                                         node, "{}{}/".format(path, dir_name)
                                         )
         else:
-            self._file_structures[self._cur_parent].append(
+            self._file_structures[parent].append(
                     MetaInfo(level, True, name, tree_node, path)
                     )
 
             if tree_node.status == FolderStatus.OPEN:
                 for dir_name, node in tree_node.dirs.items():
-                    self.buildFileStructure(level + 1, dir_name, node,
+                    self.buildFileStructure(parent, level + 1, dir_name, node,
                                             "{}{}/".format(path, dir_name))
 
-                self.appendFiles(level + 1, tree_node)
+                self.appendFiles(parent, level + 1, tree_node)
 
-    def appendRemainingFiles(self, tree_node):
+    def appendRemainingFiles(self, parent, tree_node):
         if len(tree_node.dirs) == 0:
             return
 
@@ -688,16 +703,16 @@ class TreeView(GitCommandView):
         if len(node.dirs) > 1:
             if node.status == FolderStatus.OPEN:
                 child_dir_name, child_node = node.dirs.last_key_value()
-                self.buildFileStructure(1, child_dir_name, child_node,
+                self.buildFileStructure(parent, 1, child_dir_name, child_node,
                                         "{}/{}/".format(dir_name, child_dir_name))
 
-                self.appendFiles(1, node)
+                self.appendFiles(parent, 1, node)
         else:
-            self.buildFileStructure(0, dir_name, node, dir_name + "/")
+            self.buildFileStructure(parent, 0, dir_name, node, dir_name + "/")
 
-    def appendFiles(self, level, tree_node):
+    def appendFiles(self, parent, level, tree_node):
         for k, v in tree_node.files.items():
-            self._file_structures[self._cur_parent].append(
+            self._file_structures[parent].append(
                     MetaInfo(level, False, k, v,
                              v[3] if v[4] == "" else v[4])
                     )
@@ -727,10 +742,14 @@ class TreeView(GitCommandView):
                 self._cur_parent = parent
             self._trees[parent] = TreeNode()
             self._file_structures[parent] = []
+            self._source_queue[parent] = Queue.Queue()
         elif line.startswith(":"):
+            parent, tree_node = self._trees.last_key_value()
             mode, source = self.generateSource(line)
+            if self._source_queue[parent].empty():
+                self._source_queue[parent].put(source)
+
             file_path = source[3] if source[4] == "" else source[4]
-            tree_node = self._trees.last_value()
             if mode == "160000": # gitlink
                 directories = file_path.split("/")
             else:
@@ -745,21 +764,21 @@ class TreeView(GitCommandView):
                         if len(tree_node.dirs) > 0:
                             if i == 1:
                                 if len(tree_node.dirs) == 1:
-                                    self._file_structures[self._cur_parent].append(
+                                    self._file_structures[parent].append(
                                             MetaInfo(0, True, level0_dir_name,
                                                      tree_node, level0_dir_name + "/")
                                             )
 
                                 if tree_node.status == FolderStatus.OPEN:
                                     dir_name, node = tree_node.dirs.last_key_value()
-                                    self.buildFileStructure(1, dir_name, node,
+                                    self.buildFileStructure(parent, 1, dir_name, node,
                                                             "{}/{}/".format(level0_dir_name,
                                                                             dir_name)
                                                             )
                             elif i == 0:
-                                self.appendRemainingFiles(tree_node)
+                                self.appendRemainingFiles(parent, tree_node)
 
-                        if len(self._file_structures[self._cur_parent]) >= self._preopen_num:
+                        if len(self._file_structures[parent]) >= self._preopen_num:
                             status = FolderStatus.CLOSED
                         else:
                             status = FolderStatus.OPEN
@@ -772,8 +791,8 @@ class TreeView(GitCommandView):
         elif line.startswith(" "):
             parent, tree_node = self._trees.last_key_value()
             self._short_stat[parent] = line
-            self.appendRemainingFiles(tree_node)
-            self.appendFiles(0, tree_node)
+            self.appendRemainingFiles(parent, tree_node)
+            self.appendFiles(parent, 0, tree_node)
         elif line == "":
             pass
         else:
