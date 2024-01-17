@@ -489,6 +489,14 @@ class LfOrderedDict(OrderedDict):
     def last_key_value(self):
         return next(reversed(self.items()))
 
+    def first_key(self):
+        return next(iter(self.keys()))
+
+    def first_value(self):
+        return next(iter(self.values()))
+
+    def first_key_value(self):
+        return next(iter(self.items()))
 
 class FolderStatus(Enum):
     CLOSED = 0
@@ -567,7 +575,8 @@ class TreeView(GitCommandView):
         self._short_stat = {}
         self._num_stat = {}
         self._first_source = {}
-        self._source_queue = {}
+        self._left_most_file = set()
+        self._source_queue = Queue.Queue()
         folder_icons = lfEval("g:Lf_GitFolderIcons")
         self._closed_folder_icon = folder_icons["closed"]
         self._open_folder_icon = folder_icons["open"]
@@ -643,12 +652,14 @@ class TreeView(GitCommandView):
               .format(self._window_id, id(self)))
 
     def getFirstSource(self):
-        if self._first_source.get(self._cur_parent) is not None:
+        if self._cur_parent in self._first_source:
             return self._first_source[self._cur_parent]
         else:
-            source = self._source_queue[self._cur_parent].get()
-            self._source_queue[self._cur_parent].task_done()
-            self._first_source[self._cur_parent] = source
+            parent = ""
+            while(parent != self._cur_parent):
+                parent, source = self._source_queue.get()
+                self._first_source[parent] = source
+
             return source
 
     def generateSource(self, line):
@@ -717,6 +728,15 @@ class TreeView(GitCommandView):
                              v[3] if v[4] == "" else v[4])
                     )
 
+    def enqueueLeftMostFile(self, parent):
+        self._left_most_file.add(parent)
+
+        tree_node = self._trees[parent]
+        while len(tree_node.dirs) > 0:
+            tree_node = tree_node.dirs.first_value()
+
+        self._source_queue.put((parent, tree_node.files.first_value()))
+
     def buildTree(self, line):
         """
         command output is something as follows:
@@ -742,13 +762,9 @@ class TreeView(GitCommandView):
                 self._cur_parent = parent
             self._trees[parent] = TreeNode()
             self._file_structures[parent] = []
-            self._source_queue[parent] = Queue.Queue()
         elif line.startswith(":"):
             parent, tree_node = self._trees.last_key_value()
             mode, source = self.generateSource(line)
-            if self._source_queue[parent].empty():
-                self._source_queue[parent].put(source)
-
             file_path = source[3] if source[4] == "" else source[4]
             if mode == "160000": # gitlink
                 directories = file_path.split("/")
@@ -775,6 +791,9 @@ class TreeView(GitCommandView):
                                                             "{}/{}/".format(level0_dir_name,
                                                                             dir_name)
                                                             )
+
+                                if parent not in self._left_most_file:
+                                    self.enqueueLeftMostFile(parent)
                             elif i == 0:
                                 self.appendRemainingFiles(parent, tree_node)
 
@@ -793,6 +812,8 @@ class TreeView(GitCommandView):
             self._short_stat[parent] = line
             self.appendRemainingFiles(parent, tree_node)
             self.appendFiles(parent, 0, tree_node)
+            if parent not in self._left_most_file:
+                self.enqueueLeftMostFile(parent)
         elif line == "":
             pass
         else:
@@ -1018,7 +1039,7 @@ class TreeView(GitCommandView):
 
     def setOptions(self, bufhidden):
         super(TreeView, self).setOptions(bufhidden)
-        lfCmd(r"""call win_execute({}, 'let &l:stl=" %#Lf_hl_gitStlFileChanged#0 %##file changed, %#Lf_hl_gitStlAdd#0 (+), %#Lf_hl_gitStlDel#0 (-)"')"""
+        lfCmd(r"""call win_execute({}, 'let &l:stl="%#Lf_hl_gitStlChangedNum# 0 %#Lf_hl_gitStlFileChanged#file changed, %#Lf_hl_gitStlAdd#0 (+), %#Lf_hl_gitStlDel#0 (-)"')"""
               .format(self._window_id))
         # 'setlocal cursorline' does not take effect on neovim
         lfCmd("call win_execute({}, 'set cursorline')".format(self._window_id))
@@ -1072,7 +1093,8 @@ class TreeView(GitCommandView):
                 self._buffer.options['modifiable'] = False
 
         if self._read_finished == 1 and self._offset_in_content == len(structure):
-            shortstat = re.sub(r"(\d+)( files? changed)", r"%#Lf_hl_gitStlFileChanged#\1%##\2",
+            shortstat = re.sub(r"( \d+)( files? changed)",
+                               r"%#Lf_hl_gitStlChangedNum#\1%#Lf_hl_gitStlFileChanged#\2",
                                self._short_stat[self._cur_parent])
             shortstat = re.sub(r"(\d+) insertions?", r"%#Lf_hl_gitStlAdd#\1 ",shortstat)
             shortstat = re.sub(r"(\d+) deletions?", r"%#Lf_hl_gitStlDel#\1 ", shortstat)
@@ -1288,7 +1310,11 @@ class DiffViewPanel(Panel):
                 win_ids = [int(lfEval("win_getid({})".format(w.number)))
                            for w in vim.current.tabpage.windows]
             elif "winid" in kwargs:
-                pass
+                win_ids = [kwargs["winid"], 0]
+                lfCmd("call win_gotoid({})".format(win_ids[0]))
+                lfCmd("noautocmd bel vsp")
+                win_ids[1] = int(lfEval("win_getid()"))
+                lfCmd("call win_gotoid({})".format(win_ids[0]))
             else:
                 wins = vim.current.tabpage.windows
                 if (len(wins) == 2
@@ -1332,12 +1358,15 @@ class NavigationPanel(Panel):
         if self._tree_view is not None:
             self._tree_view.writeBuffer()
 
+    def getFirstSource(self):
+        return self._tree_view.getFirstSource()
+
 
 class ExplorerPage(object):
     def __init__(self, project_root):
         self._project_root = project_root
-        self._navigation_panel = None
-        self._diff_view_panel = None
+        self._navigation_panel = NavigationPanel()
+        self._diff_view_panel = DiffViewPanel()
         self.tabpage = None
 
     def _createWindow(self, win_pos, buffer_name):
@@ -1362,13 +1391,15 @@ class ExplorerPage(object):
     def create(self, arguments_dict, source):
         lfCmd("noautocmd tabnew")
         self.tabpage = vim.current.tabpage
+        diff_view_winid = int(lfEval("win_getid()"))
 
         cmd = GitLogExplCommand(arguments_dict, source)
         win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
         winid = self._createWindow(win_pos, cmd.getBufferName())
 
-        self._navigation_panel = NavigationPanel()
         self._navigation_panel.create(cmd, winid, self._project_root)
+        source = self._navigation_panel.getFirstSource()
+        self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
 
     def cleanup(self):
         if self._navigation_panel is not None:
