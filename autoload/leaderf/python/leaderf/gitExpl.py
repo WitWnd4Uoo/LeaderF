@@ -452,9 +452,10 @@ class GitCommandView(object):
             else:
                 self._read_finished = 1
                 self._owner.readFinished(self)
-        except Exception as e:
+        except Exception:
+            traceback.print_exc()
+            traceback.print_stack()
             self._read_finished = 1
-            print(e)
 
     def stopThread(self):
         if self._reader_thread and self._reader_thread.is_alive():
@@ -728,14 +729,22 @@ class TreeView(GitCommandView):
                              v[3] if v[4] == "" else v[4])
                     )
 
+    def getLeftMostFile(self, tree_node):
+        for node in tree_node.dirs.values():
+            result = self.getLeftMostFile(node)
+            if result is not None:
+                return result
+
+        for i in tree_node.files.values():
+            return i
+
+        return None
+
     def enqueueLeftMostFile(self, parent):
         self._left_most_file.add(parent)
 
         tree_node = self._trees[parent]
-        while len(tree_node.dirs) > 0:
-            tree_node = tree_node.dirs.first_value()
-
-        self._source_queue.put((parent, tree_node.files.first_value()))
+        self._source_queue.put((parent, self.getLeftMostFile(tree_node)))
 
     def buildTree(self, line):
         """
@@ -1113,9 +1122,10 @@ class TreeView(GitCommandView):
             else:
                 self._read_finished = 1
                 self._owner.readFinished(self)
-        except Exception as e:
+        except Exception:
+            traceback.print_exc()
+            traceback.print_stack()
             self._read_finished = 1
-            print(e)
 
     def cleanup(self):
         super(TreeView, self).cleanup()
@@ -1399,7 +1409,8 @@ class ExplorerPage(object):
 
         self._navigation_panel.create(cmd, winid, self._project_root)
         source = self._navigation_panel.getFirstSource()
-        self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
+        if source is not None:
+            self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
 
     def cleanup(self):
         if self._navigation_panel is not None:
