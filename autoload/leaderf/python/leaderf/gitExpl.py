@@ -1379,33 +1379,34 @@ class ExplorerPage(object):
         self._diff_view_panel = DiffViewPanel()
         self.tabpage = None
 
-    def _createWindow(self, win_pos, buffer_name):
+    def _createWindow(self, win_pos):
         if win_pos == 'top':
             height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
-            lfCmd("silent! noa keepa keepj abo {}sp {}".format(height, buffer_name))
+            lfCmd("silent! noa keepa keepj abo {}sp".format(height))
         elif win_pos == 'bottom':
             height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
-            lfCmd("silent! noa keepa keepj bel {}sp {}".format(height, buffer_name))
+            lfCmd("silent! noa keepa keepj bel {}sp".format(height))
         elif win_pos == 'left':
             width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
-            lfCmd("silent! noa keepa keepj abo {}vsp {}".format(width, buffer_name))
+            lfCmd("silent! noa keepa keepj abo {}vsp".format(width))
         elif win_pos == 'right':
             width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
-            lfCmd("silent! noa keepa keepj bel {}vsp {}".format(width, buffer_name))
+            lfCmd("silent! noa keepa keepj bel {}vsp".format(width))
         else: # left
             width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
-            lfCmd("silent! noa keepa keepj abo {}vsp {}".format(width, buffer_name))
+            lfCmd("silent! noa keepa keepj abo {}vsp".format(width))
 
         return int(lfEval("win_getid()"))
 
     def create(self, arguments_dict, source):
-        lfCmd("noautocmd tabnew")
+        cmd = GitLogExplCommand(arguments_dict, source)
+        lfCmd("noautocmd tabedit {}".format(cmd.getBufferName()))
+
         self.tabpage = vim.current.tabpage
         diff_view_winid = int(lfEval("win_getid()"))
 
-        cmd = GitLogExplCommand(arguments_dict, source)
         win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
-        winid = self._createWindow(win_pos, cmd.getBufferName())
+        winid = self._createWindow(win_pos)
 
         self._navigation_panel.create(cmd, winid, self._project_root)
         source = self._navigation_panel.getFirstSource()
