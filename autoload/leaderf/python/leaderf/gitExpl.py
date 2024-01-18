@@ -370,7 +370,7 @@ class GitCommandView(object):
     def initBuffer(self):
         pass
 
-    def defineMaps(self, winid):
+    def defineMaps(self):
         pass
 
     def create(self, bufhidden='wipe', buf_content=None):
@@ -384,7 +384,7 @@ class GitCommandView(object):
         self.init()
 
         if self._buffer is None:
-            self.defineMaps(self._window_id)
+            self.defineMaps()
             self.setOptions(bufhidden)
             if bufhidden == 'wipe':
                 lfCmd("augroup Lf_Git | augroup END")
@@ -648,7 +648,7 @@ class TreeView(GitCommandView):
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
 
-    def defineMaps(self, winid):
+    def defineMaps(self):
         lfCmd("call win_execute({}, 'call leaderf#Git#TreeViewMaps({})')"
               .format(self._window_id, id(self)))
 
@@ -877,7 +877,7 @@ class TreeView(GitCommandView):
             index = line_num - len(self._head) - 1
             structure = self._file_structures[self._cur_parent]
             if index < 0 or index >= len(structure):
-                return
+                return None
 
             meta_info = structure[index]
             if meta_info.is_dir:
@@ -885,8 +885,9 @@ class TreeView(GitCommandView):
                     self.expandFolder(line_num, index, meta_info, recursive)
                 else:
                     self.collapseFolder(line_num, index, meta_info, recursive)
+                return None
             else:
-                pass
+                return meta_info.info
 
     def expandFolder(self, line_num, index, meta_info, recursive):
         structure = self._file_structures[self._cur_parent]
@@ -1264,7 +1265,8 @@ class DiffViewPanel(Panel):
     def __init__(self):
         self._views = {}
         self._buffer_contents = {}
-        self._buffer_names = None
+        # key is current tabpage
+        self._buffer_names = {}
 
     def register(self, view):
         self._views[view.getBufferName()] = view
@@ -1279,6 +1281,7 @@ class DiffViewPanel(Panel):
 
     def cleanup(self):
         self._buffer_contents = {}
+        self._buffer_names = {}
 
     def readFinished(self, view):
         self._buffer_contents[view.getSource()] = view.getContent()
@@ -1288,6 +1291,9 @@ class DiffViewPanel(Panel):
 
     def writeFinished(self, winid):
         lfCmd("call win_execute({}, 'diffthis')".format(winid))
+
+    # def getValidWinIDs(self, win_ids):
+        # if 
 
     def create(self, arguments_dict, source, **kwargs):
         """
@@ -1319,57 +1325,72 @@ class DiffViewPanel(Panel):
                 tabmove()
                 win_ids = [int(lfEval("win_getid({})".format(w.number)))
                            for w in vim.current.tabpage.windows]
-            elif "winid" in kwargs:
+            elif "winid" in kwargs: # --explorer
                 win_ids = [kwargs["winid"], 0]
                 lfCmd("call win_gotoid({})".format(win_ids[0]))
                 lfCmd("noautocmd bel vsp")
                 win_ids[1] = int(lfEval("win_getid()"))
                 lfCmd("call win_gotoid({})".format(win_ids[0]))
+            # else:
+            #     wins = vim.current.tabpage.windows
+            #     if (len(wins) == 2
+            #         and lfEval("bufname({}+0)".format(wins[0].buffer.number)) in self._views
+            #         and lfEval("bufname({}+0)".format(wins[1].buffer.number)) in self._views):
+            #         win_ids = [int(lfEval("win_getid({})".format(w.number)))
+            #                    for w in vim.current.tabpage.windows]
+            #     else:
+            #         lfCmd("noautocmd tabnew | vsp")
+            #         tabmove()
+            #         win_ids = [int(lfEval("win_getid({})".format(w.number)))
+            #                    for w in vim.current.tabpage.windows]
+            elif vim.current.tabpage not in self._buffer_names: # Leaderf git diff -s
+                lfCmd("noautocmd tabnew | vsp")
+                tabmove()
+                win_ids = [int(lfEval("win_getid({})".format(w.number)))
+                           for w in vim.current.tabpage.windows]
             else:
-                wins = vim.current.tabpage.windows
-                if (len(wins) == 2
-                    and lfEval("bufname({}+0)".format(wins[0].buffer.number)) in self._views
-                    and lfEval("bufname({}+0)".format(wins[1].buffer.number)) in self._views):
-                    win_ids = [int(lfEval("win_getid({})".format(w.number)))
-                               for w in vim.current.tabpage.windows]
-                else:
-                    lfCmd("noautocmd tabnew | vsp")
-                    tabmove()
-                    win_ids = [int(lfEval("win_getid({})".format(w.number)))
-                               for w in vim.current.tabpage.windows]
+                buffer_names = self._buffer_names[vim.current.tabpage]
+                win_ids = [int(lfEval("bufwinid('{}')".format(escQuote(name)))) for name in buffer_names]
 
             cat_file_cmds = [GitCatFileCommand(arguments_dict, s) for s in sources]
             outputs = [self.getContent(s) for s in sources]
             if None in outputs:
                 outputs = ParallelExecutor.run(*cat_file_cmds)
 
+            if vim.current.tabpage not in self._buffer_names:
+                self._buffer_names[vim.current.tabpage] = [None, None]
+
             for i, (cmd, winid) in enumerate(zip(cat_file_cmds, win_ids)):
                 lfCmd("call win_execute({}, 'edit {}')".format(winid, cmd.getBufferName()))
+                self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
                 GitCommandView(self, cmd, winid).create(buf_content=outputs[i])
 
 
 class NavigationPanel(Panel):
     def __init__(self):
-        self._tree_view = None
+        self.tree_view = None
 
     def register(self, view):
-        self._tree_view = view
+        self.tree_view = view
 
     def cleanup(self):
-        if self._tree_view is not None:
-            self._tree_view.cleanup()
-            self._tree_view = None
+        if self.tree_view is not None:
+            self.tree_view.cleanup()
+            self.tree_view = None
 
     def create(self, cmd, winid, project_root):
         TreeView(self, cmd, winid, project_root).create(bufhidden="hide")
 
     def writeBuffer(self):
         # called in idle
-        if self._tree_view is not None:
-            self._tree_view.writeBuffer()
+        if self.tree_view is not None:
+            self.tree_view.writeBuffer()
 
     def getFirstSource(self):
-        return self._tree_view.getFirstSource()
+        return self.tree_view.getFirstSource()
+
+    def getWindowId(self):
+        return self.tree_view.getWindowId()
 
 
 class ExplorerPage(object):
@@ -1377,6 +1398,7 @@ class ExplorerPage(object):
         self._project_root = project_root
         self._navigation_panel = NavigationPanel()
         self._diff_view_panel = DiffViewPanel()
+        self._arguments = {}
         self.tabpage = None
 
     def _createWindow(self, win_pos):
@@ -1398,7 +1420,12 @@ class ExplorerPage(object):
 
         return int(lfEval("win_getid()"))
 
+    def defineMaps(self, winid):
+        lfCmd("call win_execute({}, 'call leaderf#Git#ExplorerMaps({})')"
+              .format(winid, id(self)))
+
     def create(self, arguments_dict, source):
+        self._arguments = arguments_dict
         cmd = GitLogExplCommand(arguments_dict, source)
         lfCmd("noautocmd tabedit {}".format(cmd.getBufferName()))
 
@@ -1409,9 +1436,13 @@ class ExplorerPage(object):
         winid = self._createWindow(win_pos)
 
         self._navigation_panel.create(cmd, winid, self._project_root)
+        self.defineMaps(self._navigation_panel.getWindowId())
+
         source = self._navigation_panel.getFirstSource()
         if source is not None:
             self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
+        else:
+            lfCmd("only")
 
     def cleanup(self):
         if self._navigation_panel is not None:
@@ -1419,6 +1450,11 @@ class ExplorerPage(object):
 
         # if self._diff_view_panel is not None:
             # self._diff_view_panel.cleanup()
+
+    def expandOrCollapseFolder(self, recursive):
+        source = self._navigation_panel.tree_view.expandOrCollapseFolder(recursive)
+        if source is not None:
+            self._diff_view_panel.create(self._arguments, source)
 
 
 #*****************************************************

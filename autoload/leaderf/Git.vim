@@ -48,10 +48,19 @@ endfunction
 function! leaderf#Git#TreeViewMaps(id)
     exec g:Lf_py "import ctypes"
     let tree_view = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
-    exec printf('nnoremap <buffer> <silent> o             :exec g:Lf_py "%s.expandOrCollapseFolder(False)"<CR>', tree_view)
-    exec printf('nnoremap <buffer> <silent> O             :exec g:Lf_py "%s.expandOrCollapseFolder(True)"<CR>', tree_view)
+    "exec printf('nnoremap <buffer> <silent> o             :exec g:Lf_py "%s.expandOrCollapseFolder(False)"<CR>', tree_view)
+    "exec printf('nnoremap <buffer> <silent> O             :exec g:Lf_py "%s.expandOrCollapseFolder(True)"<CR>', tree_view)
     exec printf('nnoremap <silent> <C-G>             :exec g:Lf_py "%s.locateFile(''aa'')"<CR>', tree_view)
     exec printf('command! -bar LeaderfFind exec g:Lf_py "%s.locateFile(''aa'')"', tree_view)
+endfunction
+
+function! leaderf#Git#ExplorerMaps(id)
+    exec g:Lf_py "import ctypes"
+    let explorer_page = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
+    exec printf('nnoremap <buffer> <silent> o             :exec g:Lf_py "%s.expandOrCollapseFolder(False)"<CR>', explorer_page)
+    exec printf('nnoremap <buffer> <silent> O             :exec g:Lf_py "%s.expandOrCollapseFolder(True)"<CR>', explorer_page)
+    "exec printf('nnoremap <silent> <C-G>             :exec g:Lf_py "%s.locateFile(''aa'')"<CR>', explorer_page)
+    "exec printf('command! -bar LeaderfFind exec g:Lf_py "%s.locateFile(''aa'')"', explorer_page)
 endfunction
 
 function! leaderf#Git#TimerCallback(manager_id, id)
