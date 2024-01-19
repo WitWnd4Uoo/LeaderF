@@ -286,8 +286,9 @@ class ParallelExecutor(object):
                     output.append(line)
                     if stop_thread:
                         break
-            except Exception as e:
-                print(e)
+            except Exception:
+                traceback.print_exc()
+                traceback.print_stack()
 
 
         executors = [AsyncExecutor() for _ in range(len(cmds))]
