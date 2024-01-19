@@ -312,10 +312,9 @@ class ParallelExecutor(object):
 
 
 class GitCommandView(object):
-    def __init__(self, owner, cmd, window_id):
+    def __init__(self, owner, cmd):
         self._owner = owner
         self._cmd = cmd
-        self._window_id = window_id
         self._executor = AsyncExecutor()
         self._buffer = None
         self.init()
@@ -361,41 +360,46 @@ class GitCommandView(object):
         self._reader_thread.daemon = True
         self._reader_thread.start()
 
-    def setOptions(self, bufhidden):
-        lfCmd("call win_execute({}, 'setlocal nobuflisted')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal buftype=nofile')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal bufhidden={}')".format(self._window_id, bufhidden))
-        lfCmd("call win_execute({}, 'setlocal undolevels=-1')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal noswapfile')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal nospell')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal nomodifiable')".format(self._window_id))
-        lfCmd("call win_execute({}, '{}')".format(self._window_id, self._cmd.getFileTypeCommand()))
+    def setOptions(self, winid, bufhidden):
+        lfCmd("call win_execute({}, 'setlocal nobuflisted')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal buftype=nofile')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal bufhidden={}')".format(winid, bufhidden))
+        lfCmd("call win_execute({}, 'setlocal undolevels=-1')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal noswapfile')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal nospell')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal nomodifiable')".format(winid))
+        lfCmd("call win_execute({}, '{}')".format(winid, self._cmd.getFileTypeCommand()))
 
     def initBuffer(self):
         pass
 
-    def defineMaps(self):
+    def defineMaps(self, winid):
         pass
 
-    def create(self, bufhidden='wipe', buf_content=None):
+    def enableColor(self, winid):
+        pass
+
+    def create(self, winid, bufhidden='wipe', buf_content=None):
         if self._buffer is not None:
             self._buffer.options['modifiable'] = True
             del self._buffer[:]
             self._buffer.options['modifiable'] = False
             self.cleanup()
-            lfCmd("call win_gotoid({})".format(self._window_id))
+            lfCmd("call win_gotoid({})".format(self.getWindowId()))
 
         self.init()
 
         if self._buffer is None:
-            self.defineMaps()
-            self.setOptions(bufhidden)
+            self.defineMaps(winid)
+            self.setOptions(winid, bufhidden)
             if bufhidden == 'wipe':
                 lfCmd("augroup Lf_Git | augroup END")
                 lfCmd("call win_execute({}, 'autocmd! Lf_Git BufWipeout <buffer> call leaderf#Git#Suicide({})')"
-                      .format(self._window_id, id(self)))
+                      .format(winid, id(self)))
 
-        self._buffer = vim.buffers[int(lfEval("winbufnr({})".format(self._window_id)))]
+            self._buffer = vim.buffers[int(lfEval("winbufnr({})".format(winid)))]
+
+        self.enableColor(self.getWindowId())
 
         if buf_content is not None:
             # cache the content if buf_content is the result of ParallelExecutor.run()
@@ -564,8 +568,8 @@ class Bisect(object):
 
 
 class TreeView(GitCommandView):
-    def __init__(self, owner, cmd, window_id, project_root):
-        super(TreeView, self).__init__(owner, cmd, window_id)
+    def __init__(self, owner, cmd, project_root):
+        super(TreeView, self).__init__(owner, cmd)
         self._project_root = project_root
         # key is the parent hash, value is a TreeNode
         self._trees = LfOrderedDict()
@@ -601,57 +605,56 @@ class TreeView(GitCommandView):
                 self._project_root + "/",
                 ]
         self._match_ids = []
-        self.enableColor()
 
-    def enableColor(self):
+    def enableColor(self, winid):
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitHelp'', ''^".*'', -100)')"""
-              .format(self._window_id))
+              .format(winid))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolder'', ''\S*/'', -100)')"""
-              .format(self._window_id))
+              .format(winid))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitFolderIcon'', ''^\s*\zs[{}{}]'', -100)')"""
-              .format(self._window_id, self._closed_folder_icon, self._open_folder_icon))
+              .format(winid, self._closed_folder_icon, self._open_folder_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitAddIcon'', ''^\s*\zs{}'', -100)')"""
-              .format(self._window_id, self._add_icon))
+              .format(winid, self._add_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitCopyIcon'', ''^\s*\zs{}'', -100)')"""
-              .format(self._window_id, self._copy_icon))
+              .format(winid, self._copy_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitDelIcon'', ''^\s*\zs{}'', -100)')"""
-              .format(self._window_id, self._del_icon))
+              .format(winid, self._del_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitModificationIcon'', ''^\s*\zs{}'', -100)')"""
-              .format(self._window_id, self._modification_icon))
+              .format(winid, self._modification_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', ''^\s*\zs{}'', -100)')"""
-              .format(self._window_id, self._rename_icon))
+              .format(winid, self._rename_icon))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatAdd'', ''\t\zs+\d\+'', -100)')"""
-              .format(self._window_id))
+              .format(winid))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatDel'', ''\t+\d\+\s\+\zs-\d\+'', -100)')"""
-              .format(self._window_id))
+              .format(winid))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatBinary'', ''\t\zs(Bin)'', -100)')"""
-              .format(self._window_id))
+              .format(winid))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
 
-    def defineMaps(self):
+    def defineMaps(self, winid):
         lfCmd("call win_execute({}, 'call leaderf#Git#TreeViewMaps({})')"
-              .format(self._window_id, id(self)))
+              .format(winid, id(self)))
 
     def getFirstSource(self):
         if self._cur_parent in self._first_source:
@@ -992,10 +995,10 @@ class TreeView(GitCommandView):
         structure = self._file_structures[self._cur_parent]
         index = Bisect.bisect_left(structure, 0, key=getKey)
         if index < len(structure) and structure[index].path == path:
-            # lfCmd("call win_gotoid({})" .format(self._window_id))
+            # lfCmd("call win_gotoid({})" .format(self.getWindowId()))
             # lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
             lfCmd("call win_execute({}, '{} | norm! zz')"
-                  .format(self._window_id, index + 1 + len(self._head)))
+                  .format(self.getWindowId(), index + 1 + len(self._head)))
             
         else:
             if not self.inFileStructure(path):
@@ -1018,8 +1021,8 @@ class TreeView(GitCommandView):
             index = Bisect.bisect_left(structure, 0, index, index + increment, key=getKey)
             if index < len(structure) and structure[index].path == path:
                 lfCmd("call win_execute({}, '{} | norm! zz')"
-                      .format(self._window_id, index + 1 + len(self._head)))
-                # lfCmd("call win_gotoid({})" .format(self._window_id))
+                      .format(self.getWindowId(), index + 1 + len(self._head)))
+                # lfCmd("call win_gotoid({})" .format(self.getWindowId()))
                 # lfCmd("{} | norm! 0zz" .format(index + 1 + len(self._head)))
             else:
                 lfPrintError("BUG: File can't be found!")
@@ -1048,25 +1051,25 @@ class TreeView(GitCommandView):
                                           num_stat
                                           )
 
-    def setOptions(self, bufhidden):
-        super(TreeView, self).setOptions(bufhidden)
+    def setOptions(self, winid, bufhidden):
+        super(TreeView, self).setOptions(winid, bufhidden)
         lfCmd(r"""call win_execute({}, 'let &l:stl="%#Lf_hl_gitStlChangedNum# 0 %#Lf_hl_gitStlFileChanged#file changed, %#Lf_hl_gitStlAdd#0 (+), %#Lf_hl_gitStlDel#0 (-)"')"""
-              .format(self._window_id))
+              .format(winid))
         # 'setlocal cursorline' does not take effect on neovim
-        lfCmd("call win_execute({}, 'set cursorline')".format(self._window_id))
-        lfCmd("call win_execute({}, 'set nonumber')".format(self._window_id))
-        lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal foldmethod=indent')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal conceallevel=0')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal winfixwidth')".format(self._window_id))
-        lfCmd("call win_execute({}, 'setlocal winfixheight')".format(self._window_id))
+        lfCmd("call win_execute({}, 'set cursorline')".format(winid))
+        lfCmd("call win_execute({}, 'set nonumber')".format(winid))
+        lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal foldmethod=indent')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal conceallevel=0')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal winfixwidth')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal winfixheight')".format(winid))
         try:
             lfCmd(r"call win_execute({}, 'setlocal list lcs=leadmultispace:¦\ ,tab:\ \ ')"
-                  .format(self._window_id))
+                  .format(winid))
         except vim.error:
-            lfCmd("call win_execute({}, 'setlocal nolist')".format(self._window_id))
+            lfCmd("call win_execute({}, 'setlocal nolist')".format(winid))
         lfCmd("augroup Lf_Git_Colorscheme | augroup END")
         lfCmd("autocmd Lf_Git_Colorscheme ColorScheme * call leaderf#colorscheme#popup#load('Git', '{}')"
               .format(lfEval("get(g:, 'Lf_PopupColorscheme', 'default')")))
@@ -1110,7 +1113,7 @@ class TreeView(GitCommandView):
             shortstat = re.sub(r"(\d+) insertions?", r"%#Lf_hl_gitStlAdd#\1 ",shortstat)
             shortstat = re.sub(r"(\d+) deletions?", r"%#Lf_hl_gitStlDel#\1 ", shortstat)
             lfCmd(r"""call win_execute({}, 'let &l:stl="{}"')"""
-                  .format(self._window_id, shortstat))
+                  .format(self.getWindowId(), shortstat))
             self._read_finished = 2
             self.stopTimer()
 
@@ -1191,10 +1194,10 @@ class ResultPanel(Panel):
     def create(self, cmd, content=None):
         buffer_name = cmd.getBufferName()
         if buffer_name in self._views and self._views[buffer_name].valid():
-            self._views[buffer_name].create(buf_content=content)
+            self._views[buffer_name].create(-1, buf_content=content)
         else:
             winid = self._createWindow(cmd.getArguments().get("--position", [""])[0], buffer_name)
-            GitCommandView(self, cmd, winid).create(buf_content=content)
+            GitCommandView(self, cmd).create(winid, buf_content=content)
 
     def writeBuffer(self):
         for v in self._views.values():
@@ -1226,11 +1229,11 @@ class PreviewPanel(Panel):
             lfCmd("noautocmd silent! let winid = popup_create([], %s)" % json.dumps(config))
             self._preview_winid = int(lfEval("winid"))
 
-        GitCommandView(self, cmd, self._preview_winid).create()
+        GitCommandView(self, cmd).create(self._preview_winid)
 
     def createView(self, cmd):
         if self._preview_winid > 0:
-            GitCommandView(self, cmd, self._preview_winid).create()
+            GitCommandView(self, cmd).create(self._preview_winid)
 
     def writeBuffer(self):
         if self._view is not None:
@@ -1306,13 +1309,15 @@ class DiffViewPanel(Panel):
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[0]].getWindowId()))
             cmd = GitCatFileCommand(arguments_dict, sources[1])
             lfCmd("rightbelow vsp {}".format(cmd.getBufferName()))
-            GitCommandView(self, cmd, int(lfEval("win_getid()"))).create(buf_content=self.getContent(sources[1]))
+            GitCommandView(self, cmd).create(int(lfEval("win_getid()")),
+                                             buf_content=self.getContent(sources[1]))
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[0]].getWindowId()))
         elif buffer_names[1] in self._views:
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[1]].getWindowId()))
             cmd = GitCatFileCommand(arguments_dict, sources[0])
             lfCmd("leftabove vsp {}".format(cmd.getBufferName()))
-            GitCommandView(self, cmd, int(lfEval("win_getid()"))).create(buf_content=self.getContent(sources[0]))
+            GitCommandView(self, cmd).create(int(lfEval("win_getid()")),
+                                             buf_content=self.getContent(sources[0]))
         else:
             if kwargs.get("mode", '') == 't':
                 lfCmd("noautocmd tabnew | vsp")
@@ -1357,7 +1362,7 @@ class DiffViewPanel(Panel):
             for i, (cmd, winid) in enumerate(zip(cat_file_cmds, win_ids)):
                 lfCmd("call win_execute({}, 'edit {}')".format(winid, cmd.getBufferName()))
                 self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
-                GitCommandView(self, cmd, winid).create(buf_content=outputs[i])
+                GitCommandView(self, cmd).create(winid, buf_content=outputs[i])
 
             for winid in win_ids:
                 lfCmd("call win_execute({}, 'diffthis')".format(winid))
@@ -1376,7 +1381,7 @@ class NavigationPanel(Panel):
             self.tree_view = None
 
     def create(self, cmd, winid, project_root):
-        TreeView(self, cmd, winid, project_root).create(bufhidden="hide")
+        TreeView(self, cmd, project_root).create(winid, bufhidden="hide")
 
     def writeBuffer(self):
         # called in idle
