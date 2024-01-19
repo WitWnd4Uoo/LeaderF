@@ -332,7 +332,10 @@ class GitCommandView(object):
         return self._cmd.getBufferName()
 
     def getWindowId(self):
-        return self._window_id
+        if self._buffer is None or self._buffer.valid == False:
+            return -1
+        else:
+            return int(lfEval("bufwinid('{}')".format(escQuote(self._buffer.name))))
 
     def getContent(self):
         return self._content
@@ -404,12 +407,10 @@ class GitCommandView(object):
             self._buffer[:] = buf_content
             self._buffer.options['modifiable'] = False
 
-            self._owner.writeFinished(self._window_id)
             return
 
         if self._cmd.getCommand() == "":
             self._read_finished = 2
-            self._owner.writeFinished(self._window_id)
             return
 
         self.initBuffer()
@@ -440,7 +441,6 @@ class GitCommandView(object):
 
         if self._read_finished == 1 and self._offset_in_content == len(self._content):
             self._read_finished = 2
-            self._owner.writeFinished(self._window_id)
             self.stopTimer()
 
     def _readContent(self, content):
@@ -1111,7 +1111,6 @@ class TreeView(GitCommandView):
             lfCmd(r"""call win_execute({}, 'let &l:stl="{}"')"""
                   .format(self._window_id, shortstat))
             self._read_finished = 2
-            self._owner.writeFinished(self._window_id)
             self.stopTimer()
 
     def _readContent(self, content):
@@ -1152,9 +1151,6 @@ class Panel(object):
         pass
 
     def readFinished(self, view):
-        pass
-
-    def writeFinished(self, winid):
         pass
 
 
@@ -1289,9 +1285,6 @@ class DiffViewPanel(Panel):
     def getContent(self, source):
         return self._buffer_contents.get(source)
 
-    def writeFinished(self, winid):
-        lfCmd("call win_execute({}, 'diffthis')".format(winid))
-
     # def getValidWinIDs(self, win_ids):
         # if 
 
@@ -1364,6 +1357,9 @@ class DiffViewPanel(Panel):
                 lfCmd("call win_execute({}, 'edit {}')".format(winid, cmd.getBufferName()))
                 self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
                 GitCommandView(self, cmd, winid).create(buf_content=outputs[i])
+
+            for winid in win_ids:
+                lfCmd("call win_execute({}, 'diffthis')".format(winid))
 
 
 class NavigationPanel(Panel):
