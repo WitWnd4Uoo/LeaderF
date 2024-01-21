@@ -1360,6 +1360,9 @@ class DiffViewPanel(Panel):
                 self._buffer_names[vim.current.tabpage] = [None, None]
 
             for i, (cmd, winid) in enumerate(zip(cat_file_cmds, win_ids)):
+                if lfEval("bufname(bufwinnr({}))".format(winid)) == "":
+                    lfCmd("call win_execute({}, 'setlocal bufhidden=wipe')".format(winid))
+
                 lfCmd("call win_execute({}, 'edit {}')".format(winid, cmd.getBufferName()))
                 self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
                 GitCommandView(self, cmd).create(winid, buf_content=outputs[i])
@@ -1403,22 +1406,22 @@ class ExplorerPage(object):
         self._arguments = {}
         self.tabpage = None
 
-    def _createWindow(self, win_pos):
+    def _createWindow(self, win_pos, buffer_name):
         if win_pos == 'top':
             height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
-            lfCmd("silent! noa keepa keepj abo {}sp".format(height))
+            lfCmd("silent! noa keepa keepj abo {}sp {}".format(height, buffer_name))
         elif win_pos == 'bottom':
             height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
-            lfCmd("silent! noa keepa keepj bel {}sp".format(height))
+            lfCmd("silent! noa keepa keepj bel {}sp {}".format(height, buffer_name))
         elif win_pos == 'left':
             width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
-            lfCmd("silent! noa keepa keepj abo {}vsp".format(width))
+            lfCmd("silent! noa keepa keepj abo {}vsp {}".format(width, buffer_name))
         elif win_pos == 'right':
             width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
-            lfCmd("silent! noa keepa keepj bel {}vsp".format(width))
+            lfCmd("silent! noa keepa keepj bel {}vsp {}".format(width, buffer_name))
         else: # left
             width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
-            lfCmd("silent! noa keepa keepj abo {}vsp".format(width))
+            lfCmd("silent! noa keepa keepj abo {}vsp {}".format(width, buffer_name))
 
         return int(lfEval("win_getid()"))
 
@@ -1428,14 +1431,14 @@ class ExplorerPage(object):
 
     def create(self, arguments_dict, source):
         self._arguments = arguments_dict
-        cmd = GitLogExplCommand(arguments_dict, source)
-        lfCmd("noautocmd tabedit {}".format(cmd.getBufferName()))
+        lfCmd("noautocmd tabnew")
 
         self.tabpage = vim.current.tabpage
         diff_view_winid = int(lfEval("win_getid()"))
 
+        cmd = GitLogExplCommand(arguments_dict, source)
         win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
-        winid = self._createWindow(win_pos)
+        winid = self._createWindow(win_pos, cmd.getBufferName())
 
         self._navigation_panel.create(cmd, winid, self._project_root)
         self.defineMaps(self._navigation_panel.getWindowId())
