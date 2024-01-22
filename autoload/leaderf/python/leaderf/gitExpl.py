@@ -1425,6 +1425,25 @@ class ExplorerPage(object):
 
         return int(lfEval("win_getid()"))
 
+    def splitWindow(self, win_pos):
+        if win_pos == 'top':
+            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.7 - 3)")))
+            lfCmd("silent! noa keepa keepj bel {}sp".format(height))
+        elif win_pos == 'bottom':
+            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.7 - 3)")))
+            lfCmd("silent! noa keepa keepj abo {}sp".format(height))
+        elif win_pos == 'left':
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.8)")))
+            lfCmd("silent! noa keepa keepj bel {}vsp".format(width))
+        elif win_pos == 'right':
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.8)")))
+            lfCmd("silent! noa keepa keepj abo {}vsp".format(width))
+        else: # left
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.8)")))
+            lfCmd("silent! noa keepa keepj bel {}vsp".format(width))
+
+        return int(lfEval("win_getid()"))
+
     def defineMaps(self, winid):
         lfCmd("call win_execute({}, 'call leaderf#Git#ExplorerMaps({})')"
               .format(winid, id(self)))
@@ -1446,8 +1465,6 @@ class ExplorerPage(object):
         source = self._navigation_panel.getFirstSource()
         if source is not None:
             self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
-        else:
-            lfCmd("only")
 
     def cleanup(self):
         if self._navigation_panel is not None:
@@ -1459,7 +1476,12 @@ class ExplorerPage(object):
     def expandOrCollapseFolder(self, recursive):
         source = self._navigation_panel.tree_view.expandOrCollapseFolder(recursive)
         if source is not None:
-            self._diff_view_panel.create(self._arguments, source)
+            if len(vim.current.tabpage.windows) == 1:
+                win_pos = self._arguments.get("--navigation-position", ["left"])[0]
+                winid = self.splitWindow(win_pos)
+                self._diff_view_panel.create(self._arguments, source, winid=winid)
+            else:
+                self._diff_view_panel.create(self._arguments, source)
 
 
 #*****************************************************
