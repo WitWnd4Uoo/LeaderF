@@ -1477,10 +1477,15 @@ class ExplorerPage(object):
         if self._navigation_panel is not None:
             self._navigation_panel.cleanup()
 
-    def expandOrCollapseFolder(self, recursive):
+    def open(self, recursive, **kwargs):
         source = self._navigation_panel.tree_view.expandOrCollapseFolder(recursive)
         if source is not None:
-            if len(vim.current.tabpage.windows) == 1:
+            if kwargs.get("mode", '') == 't':
+                tabpage_count = len(vim.tabpages)
+                self._diff_view_panel.create(self._arguments, source, mode='t')
+                if len(vim.tabpages) > tabpage_count:
+                    tabmove()
+            elif len(vim.current.tabpage.windows) == 1:
                 win_pos = self._arguments.get("--navigation-position", ["left"])[0]
                 diff_view_winid = self.splitWindow(win_pos)
                 self._diff_view_panel.create(self._arguments, source, winid=diff_view_winid)
