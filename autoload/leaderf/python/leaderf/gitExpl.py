@@ -1291,16 +1291,8 @@ class DiffViewPanel(Panel):
 
     def getValidWinIDs(self, win_ids):
         if win_ids == [-1, -1]:
-            for w in vim.current.tabpage.windows:
-                if w == vim.current.window:
-                    continue
-                else:
-                    vim.current.window = w
-                    break
-            lfCmd("noautocmd leftabove sp")
-            win_ids[0] = int(lfEval("win_getid()"))
-            lfCmd("noautocmd rightbelow vsp")
-            win_ids[1] = int(lfEval("win_getid()"))
+            # won't happen
+            pass
         elif win_ids[0] == -1:
             lfCmd("call win_gotoid({})".format(win_ids[1]))
             lfCmd("noautocmd leftabove vsp")
@@ -1311,6 +1303,9 @@ class DiffViewPanel(Panel):
             win_ids[1] = int(lfEval("win_getid()"))
 
         return win_ids
+
+    def hasView(self):
+        return vim.current.tabpage in self._buffer_names
 
     def create(self, arguments_dict, source, **kwargs):
         """
@@ -1360,7 +1355,6 @@ class DiffViewPanel(Panel):
                 win_ids = [int(lfEval("bufwinid('{}')".format(escQuote(name)))) for name in buffer_names]
                 win_ids = self.getValidWinIDs(win_ids)
 
-            lfCmd("call win_gotoid({})".format(win_ids[0]))
             cat_file_cmds = [GitCatFileCommand(arguments_dict, s) for s in sources]
             outputs = [self.getContent(s) for s in sources]
             if None in outputs:
@@ -1379,6 +1373,8 @@ class DiffViewPanel(Panel):
 
             for winid in win_ids:
                 lfCmd("call win_execute({}, 'diffthis')".format(winid))
+
+            lfCmd("call win_gotoid({})".format(win_ids[0]))
 
 
 class NavigationPanel(Panel):
@@ -1414,9 +1410,11 @@ class ExplorerPage(object):
         self._navigation_panel = NavigationPanel()
         self._diff_view_panel = DiffViewPanel()
         self._arguments = {}
+        self._win_pos = None
         self.tabpage = None
 
     def _createWindow(self, win_pos, buffer_name):
+        self._win_pos = win_pos
         if win_pos == 'top':
             height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
             lfCmd("silent! noa keepa keepj abo {}sp {}".format(height, buffer_name))
@@ -1486,6 +1484,14 @@ class ExplorerPage(object):
             if len(vim.current.tabpage.windows) == 1:
                 win_pos = self._arguments.get("--navigation-position", ["left"])[0]
                 diff_view_winid = self.splitWindow(win_pos)
+                self._diff_view_panel.create(self._arguments, source, winid=diff_view_winid)
+            elif not self._diff_view_panel.hasView():
+                if self._win_pos in ["top", "left"]:
+                    lfCmd("wincmd w")
+                else:
+                    lfCmd("wincmd W")
+                lfCmd("noautocmd leftabove sp")
+                diff_view_winid = int(lfEval("win_getid()"))
                 self._diff_view_panel.create(self._arguments, source, winid=diff_view_winid)
             else:
                 self._diff_view_panel.create(self._arguments, source)
