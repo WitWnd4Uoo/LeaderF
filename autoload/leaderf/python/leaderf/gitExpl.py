@@ -317,6 +317,7 @@ class GitCommandView(object):
         self._cmd = cmd
         self._executor = AsyncExecutor()
         self._buffer = None
+        self._window_id = -1
         self.init()
         owner.register(self)
 
@@ -332,10 +333,7 @@ class GitCommandView(object):
         return self._cmd.getBufferName()
 
     def getWindowId(self):
-        if self._buffer is None or self._buffer.valid == False:
-            return -1
-        else:
-            return int(lfEval("bufwinid('{}')".format(escQuote(self._buffer.name))))
+        return self._window_id
 
     def getContent(self):
         return self._content
@@ -398,6 +396,7 @@ class GitCommandView(object):
                       .format(winid, id(self)))
 
             self._buffer = vim.buffers[int(lfEval("winbufnr({})".format(winid)))]
+            self._window_id = int(lfEval("bufwinid('{}')".format(escQuote(self._buffer.name))))
 
         self.enableColor(self.getWindowId())
 
