@@ -1289,8 +1289,28 @@ class DiffViewPanel(Panel):
     def getContent(self, source):
         return self._buffer_contents.get(source)
 
-    # def getValidWinIDs(self, win_ids):
-        # if 
+    def getValidWinIDs(self, win_ids):
+        if win_ids == [-1, -1]:
+            for w in vim.current.tabpage.windows:
+                if w == vim.current.window:
+                    continue
+                else:
+                    vim.current.window = w
+                    break
+            lfCmd("noautocmd leftabove sp")
+            win_ids[0] = int(lfEval("win_getid()"))
+            lfCmd("noautocmd rightbelow vsp")
+            win_ids[1] = int(lfEval("win_getid()"))
+        elif win_ids[0] == -1:
+            lfCmd("call win_gotoid({})".format(win_ids[1]))
+            lfCmd("noautocmd leftabove vsp")
+            win_ids[0] = int(lfEval("win_getid()"))
+        elif win_ids[1] == -1:
+            lfCmd("call win_gotoid({})".format(win_ids[0]))
+            lfCmd("noautocmd rightbelow vsp")
+            win_ids[1] = int(lfEval("win_getid()"))
+
+        return win_ids
 
     def create(self, arguments_dict, source, **kwargs):
         """
@@ -1330,18 +1350,6 @@ class DiffViewPanel(Panel):
                 lfCmd("noautocmd bel vsp")
                 win_ids[1] = int(lfEval("win_getid()"))
                 lfCmd("call win_gotoid({})".format(win_ids[0]))
-            # else:
-            #     wins = vim.current.tabpage.windows
-            #     if (len(wins) == 2
-            #         and lfEval("bufname({}+0)".format(wins[0].buffer.number)) in self._views
-            #         and lfEval("bufname({}+0)".format(wins[1].buffer.number)) in self._views):
-            #         win_ids = [int(lfEval("win_getid({})".format(w.number)))
-            #                    for w in vim.current.tabpage.windows]
-            #     else:
-            #         lfCmd("noautocmd tabnew | vsp")
-            #         tabmove()
-            #         win_ids = [int(lfEval("win_getid({})".format(w.number)))
-            #                    for w in vim.current.tabpage.windows]
             elif vim.current.tabpage not in self._buffer_names: # Leaderf git diff -s
                 lfCmd("noautocmd tabnew | vsp")
                 tabmove()
@@ -1350,7 +1358,9 @@ class DiffViewPanel(Panel):
             else:
                 buffer_names = self._buffer_names[vim.current.tabpage]
                 win_ids = [int(lfEval("bufwinid('{}')".format(escQuote(name)))) for name in buffer_names]
+                win_ids = self.getValidWinIDs(win_ids)
 
+            lfCmd("call win_gotoid({})".format(win_ids[0]))
             cat_file_cmds = [GitCatFileCommand(arguments_dict, s) for s in sources]
             outputs = [self.getContent(s) for s in sources]
             if None in outputs:
@@ -1470,16 +1480,13 @@ class ExplorerPage(object):
         if self._navigation_panel is not None:
             self._navigation_panel.cleanup()
 
-        # if self._diff_view_panel is not None:
-            # self._diff_view_panel.cleanup()
-
     def expandOrCollapseFolder(self, recursive):
         source = self._navigation_panel.tree_view.expandOrCollapseFolder(recursive)
         if source is not None:
             if len(vim.current.tabpage.windows) == 1:
                 win_pos = self._arguments.get("--navigation-position", ["left"])[0]
-                winid = self.splitWindow(win_pos)
-                self._diff_view_panel.create(self._arguments, source, winid=winid)
+                diff_view_winid = self.splitWindow(win_pos)
+                self._diff_view_panel.create(self._arguments, source, winid=diff_view_winid)
             else:
                 self._diff_view_panel.create(self._arguments, source)
 
