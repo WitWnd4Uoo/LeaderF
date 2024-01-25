@@ -1508,6 +1508,9 @@ class ExplorerPage(object):
             else:
                 self._diff_view_panel.create(self._arguments, source)
 
+            if kwargs.get("preview", False) == True:
+                lfCmd("call win_gotoid({})".format(self._navigation_panel.getWindowId()))
+
 
 #*****************************************************
 # GitExplManager
