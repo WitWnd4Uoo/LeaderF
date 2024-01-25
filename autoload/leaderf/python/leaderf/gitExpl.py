@@ -484,6 +484,9 @@ class GitCommandView(object):
     def suicide(self):
         self._owner.deregister(self)
 
+    def bufhidden(self):
+        self._owner.bufhidden(self)
+
     def valid(self):
         return self._buffer is not None and self._buffer.valid
 
@@ -1150,6 +1153,9 @@ class Panel(object):
         pass
 
     def deregister(self, view):
+        pass
+
+    def bufhidden(self, view):
         pass
 
     def cleanup(self):
