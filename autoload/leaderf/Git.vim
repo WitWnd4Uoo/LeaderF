@@ -80,7 +80,7 @@ endfunction
 
 function! leaderf#Git#Bufhidden(view_id)
     exec g:Lf_py "import ctypes"
-    exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.bufhidden()", a:view_id)
+    exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.bufHidden()", a:view_id)
 endfunction
 
 function! leaderf#Git#CleanupExplorerPage(view_id)
