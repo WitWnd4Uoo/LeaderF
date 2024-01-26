@@ -1409,7 +1409,7 @@ class DiffViewPanel(Panel):
                 self._buffer_names[vim.current.tabpage] = [None, None]
 
             for i, (cmd, winid) in enumerate(zip(cat_file_cmds, win_ids)):
-                if (lfEval("bufname(bufwinnr({}))".format(winid)) == ""
+                if (lfEval("bufname(winbufnr({}))".format(winid)) == ""
                     and int(lfEval("bufnr('{}')".format(escQuote(cmd.getBufferName())))) != -1):
                     lfCmd("call win_execute({}, 'setlocal bufhidden=wipe')".format(winid))
 
