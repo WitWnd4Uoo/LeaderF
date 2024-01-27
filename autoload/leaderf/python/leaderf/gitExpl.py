@@ -332,6 +332,9 @@ class GitCommandView(object):
     def getBufferName(self):
         return self._cmd.getBufferName()
 
+    def getBufferNumber(self):
+        return self._buffer.number
+
     def getWindowId(self):
         return self._window_id
 
@@ -393,14 +396,11 @@ class GitCommandView(object):
         if self._buffer is None:
             self.defineMaps(winid)
             self.setOptions(winid, bufhidden)
-            if bufhidden == 'wipe':
-                lfCmd("augroup Lf_Git | augroup END")
-                lfCmd("call win_execute({}, 'autocmd! Lf_Git BufWipeout <buffer> call leaderf#Git#Suicide({})')"
-                      .format(winid, id(self)))
-            elif bufhidden == 'hide':
-                lfCmd("augroup Lf_Git | augroup END")
-                lfCmd("call win_execute({}, 'autocmd! Lf_Git BufHidden <buffer> call leaderf#Git#Bufhidden({})')"
-                      .format(winid, id(self)))
+            lfCmd("augroup Lf_Git | augroup END")
+            lfCmd("call win_execute({}, 'autocmd! Lf_Git BufWipeout <buffer> call leaderf#Git#Suicide({})')"
+                  .format(winid, id(self)))
+            lfCmd("call win_execute({}, 'autocmd! Lf_Git BufHidden <buffer> call leaderf#Git#Bufhidden({})')"
+                  .format(winid, id(self)))
 
             self._buffer = vim.buffers[int(lfEval("winbufnr({})".format(winid)))]
             self._window_id = int(lfEval("bufwinid('{}')".format(escQuote(self._buffer.name))))
@@ -1068,9 +1068,8 @@ class TreeView(GitCommandView):
         super(TreeView, self).setOptions(winid, bufhidden)
         lfCmd(r"""call win_execute({}, 'let &l:stl="%#Lf_hl_gitStlChangedNum# 0 %#Lf_hl_gitStlFileChanged#file changed, %#Lf_hl_gitStlAdd#0 (+), %#Lf_hl_gitStlDel#0 (-)"')"""
               .format(winid))
-        # 'setlocal cursorline' does not take effect on neovim
-        lfCmd("call win_execute({}, 'set cursorline')".format(winid))
-        lfCmd("call win_execute({}, 'set nonumber')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal cursorline')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal nonumber')".format(winid))
         lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(winid))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(winid))
         lfCmd("call win_execute({}, 'setlocal foldmethod=indent')".format(winid))
@@ -1293,6 +1292,7 @@ class DiffViewPanel(Panel):
         self._views[view.getBufferName()] = view
 
     def deregister(self, view):
+        # :bw
         name = view.getBufferName()
         if name in self._views:
             self._views[name].cleanup()
@@ -1300,11 +1300,18 @@ class DiffViewPanel(Panel):
             if len(self._views) == 0:
                 self.cleanup()
 
+        if name in self._hidden_views:
+            self._hidden_views[name].cleanup()
+            del self._hidden_views[name]
+
     def bufHidden(self, view):
         name = view.getBufferName()
         del self._views[name]
         self._hidden_views[name] = view
         lfCmd("call win_execute({}, 'diffoff')".format(view.getWindowId()))
+
+        if len(self._views) == 0:
+            lfCmd("call timer_start(1, function('leaderf#Git#Cleanup', [{}]))".format(id(self)))
 
     def bufShown(self, buffer_name, winid):
         view = self._hidden_views[buffer_name]
@@ -1314,8 +1321,13 @@ class DiffViewPanel(Panel):
         lfCmd("call win_execute({}, 'diffthis')".format(winid))
 
     def cleanup(self):
-        self._buffer_contents = {}
-        self._buffer_names = {}
+        for view in self._hidden_views.values():
+            view.cleanup()
+            lfCmd("noautocmd bwipe! {}".format(view.getBufferNumber()))
+        self._hidden_views = {}
+
+        # self._buffer_contents = {}
+        # self._buffer_names = {}
 
     def readFinished(self, view):
         self._buffer_contents[view.getSource()] = view.getContent()
@@ -1362,9 +1374,7 @@ class DiffViewPanel(Panel):
             cmd = GitCatFileCommand(arguments_dict, sources[1])
             lfCmd("rightbelow vsp {}".format(cmd.getBufferName()))
             if buffer_names[1] not in self._hidden_views:
-                GitCommandView(self, cmd).create(int(lfEval("win_getid()")),
-                                                 bufhidden='hide',
-                                                 buf_content=self.getContent(sources[1]))
+                GitCommandView(self, cmd).create(int(lfEval("win_getid()")), bufhidden='hide')
             else:
                 self.bufShown(buffer_names[1], int(lfEval("win_getid()")))
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[0]].getWindowId()))
@@ -1373,9 +1383,7 @@ class DiffViewPanel(Panel):
             cmd = GitCatFileCommand(arguments_dict, sources[0])
             lfCmd("leftabove vsp {}".format(cmd.getBufferName()))
             if buffer_names[0] not in self._hidden_views:
-                GitCommandView(self, cmd).create(int(lfEval("win_getid()")),
-                                                 bufhidden='hide',
-                                                 buf_content=self.getContent(sources[0]))
+                GitCommandView(self, cmd).create(int(lfEval("win_getid()")), bufhidden='hide')
             else:
                 self.bufShown(buffer_names[0], int(lfEval("win_getid()")))
         else:
@@ -1413,7 +1421,7 @@ class DiffViewPanel(Panel):
                     and int(lfEval("bufnr('{}')".format(escQuote(cmd.getBufferName())))) != -1):
                     lfCmd("call win_execute({}, 'setlocal bufhidden=wipe')".format(winid))
 
-                lfCmd("call win_execute({}, 'edit {}')".format(winid, cmd.getBufferName()))
+                lfCmd("call win_execute({}, 'hide edit {}')".format(winid, cmd.getBufferName()))
                 self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
                 if cmd.getBufferName() not in self._hidden_views:
                     GitCommandView(self, cmd).create(winid, bufhidden='hide', buf_content=outputs[i])
