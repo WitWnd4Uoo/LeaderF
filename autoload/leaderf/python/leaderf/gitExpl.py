@@ -1284,7 +1284,6 @@ class DiffViewPanel(Panel):
     def __init__(self):
         self._views = {}
         self._hidden_views = {}
-        self._buffer_contents = {}
         # key is current tabpage
         self._buffer_names = {}
 
@@ -1326,14 +1325,7 @@ class DiffViewPanel(Panel):
             lfCmd("noautocmd bwipe! {}".format(view.getBufferNumber()))
         self._hidden_views = {}
 
-        # self._buffer_contents = {}
-        # self._buffer_names = {}
-
-    def readFinished(self, view):
-        self._buffer_contents[view.getSource()] = view.getContent()
-
-    def getContent(self, source):
-        return self._buffer_contents.get(source)
+        self._buffer_names = {}
 
     def writeFinished(self, winid):
         lfCmd("call win_execute({}, 'diffthis')".format(winid))
@@ -1344,11 +1336,11 @@ class DiffViewPanel(Panel):
             pass
         elif win_ids[0] == -1:
             lfCmd("call win_gotoid({})".format(win_ids[1]))
-            lfCmd("noautocmd leftabove vsp")
+            lfCmd("noautocmd leftabove vertical new")
             win_ids[0] = int(lfEval("win_getid()"))
         elif win_ids[1] == -1:
             lfCmd("call win_gotoid({})".format(win_ids[0]))
-            lfCmd("noautocmd rightbelow vsp")
+            lfCmd("noautocmd rightbelow vertical new")
             win_ids[1] = int(lfEval("win_getid()"))
 
         return win_ids
@@ -1373,19 +1365,19 @@ class DiffViewPanel(Panel):
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[0]].getWindowId()))
             cmd = GitCatFileCommand(arguments_dict, sources[1])
             lfCmd("rightbelow vsp {}".format(cmd.getBufferName()))
-            if buffer_names[1] not in self._hidden_views:
-                GitCommandView(self, cmd).create(int(lfEval("win_getid()")), bufhidden='hide')
-            else:
+            if buffer_names[1] in self._hidden_views:
                 self.bufShown(buffer_names[1], int(lfEval("win_getid()")))
+            else:
+                GitCommandView(self, cmd).create(int(lfEval("win_getid()")), bufhidden='hide')
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[0]].getWindowId()))
         elif buffer_names[1] in self._views:
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[1]].getWindowId()))
             cmd = GitCatFileCommand(arguments_dict, sources[0])
             lfCmd("leftabove vsp {}".format(cmd.getBufferName()))
-            if buffer_names[0] not in self._hidden_views:
-                GitCommandView(self, cmd).create(int(lfEval("win_getid()")), bufhidden='hide')
-            else:
+            if buffer_names[0] in self._hidden_views:
                 self.bufShown(buffer_names[0], int(lfEval("win_getid()")))
+            else:
+                GitCommandView(self, cmd).create(int(lfEval("win_getid()")), bufhidden='hide')
         else:
             if kwargs.get("mode", '') == 't':
                 lfCmd("noautocmd tabnew | vsp")
@@ -1409,8 +1401,9 @@ class DiffViewPanel(Panel):
                 win_ids = self.getValidWinIDs(win_ids)
 
             cat_file_cmds = [GitCatFileCommand(arguments_dict, s) for s in sources]
-            outputs = [self.getContent(s) for s in sources]
-            if None in outputs:
+            outputs = [None, None]
+            if (cat_file_cmds[0].getBufferName() not in self._hidden_views
+                and cat_file_cmds[1].getBufferName() not in self._hidden_views):
                 outputs = ParallelExecutor.run(*cat_file_cmds)
 
             if vim.current.tabpage not in self._buffer_names:
@@ -1423,10 +1416,10 @@ class DiffViewPanel(Panel):
 
                 lfCmd("call win_execute({}, 'hide edit {}')".format(winid, cmd.getBufferName()))
                 self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
-                if cmd.getBufferName() not in self._hidden_views:
-                    GitCommandView(self, cmd).create(winid, bufhidden='hide', buf_content=outputs[i])
-                else:
+                if cmd.getBufferName() in self._hidden_views:
                     self.bufShown(cmd.getBufferName(), winid)
+                else:
+                    GitCommandView(self, cmd).create(winid, bufhidden='hide', buf_content=outputs[i])
 
             lfCmd("call win_gotoid({})".format(win_ids[0]))
 
