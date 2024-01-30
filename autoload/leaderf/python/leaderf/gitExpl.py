@@ -340,6 +340,9 @@ class GitCommandView(object):
         return self._cmd.getBufferName()
 
     def getWindowId(self):
+        if lfEval("win_id2tabwin({})".format(self._window_id)) == ['0', '0']:
+            # self._window_id = int(lfEval("get(win_findbuf({}), 0, -1)".format(self._buffer.number)))
+            self._window_id = int(lfEval("bufwinid('{}')".format(escQuote(self._buffer.name))))
         return self._window_id
 
     def setWindowId(self, winid):
@@ -409,7 +412,7 @@ class GitCommandView(object):
                   .format(winid, id(self)))
 
             self._buffer = vim.buffers[int(lfEval("winbufnr({})".format(winid)))]
-            self._window_id = int(lfEval("bufwinid('{}')".format(escQuote(self._buffer.name))))
+            self._window_id = winid
 
         self.enableColor(self.getWindowId())
 
@@ -658,6 +661,9 @@ class TreeView(GitCommandView):
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', ''^\s*\zs{}'', -100)')"""
               .format(winid, self._rename_icon))
+        id = int(lfEval("matchid"))
+        lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitRenameIcon'', '' \zs=>\ze '', -100)')"""
+              .format(winid))
         id = int(lfEval("matchid"))
         self._match_ids.append(id)
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitNumStatAdd'', ''\t\zs+\d\+'', -100)')"""
