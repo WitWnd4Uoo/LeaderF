@@ -318,6 +318,7 @@ class GitCommandView(object):
         self._executor = AsyncExecutor()
         self._buffer = None
         self._window_id = -1
+        self._bufhidden = 'wipe'
         self.init()
         owner.register(self)
 
@@ -331,9 +332,6 @@ class GitCommandView(object):
 
     def getBufferName(self):
         return self._cmd.getBufferName()
-
-    def getBufferNumber(self):
-        return self._buffer.number
 
     def getWindowId(self):
         return self._window_id
@@ -384,6 +382,8 @@ class GitCommandView(object):
         pass
 
     def create(self, winid, bufhidden='wipe', buf_content=None):
+        self._bufhidden = bufhidden
+
         if self._buffer is not None:
             self._buffer.options['modifiable'] = True
             del self._buffer[:]
@@ -487,6 +487,9 @@ class GitCommandView(object):
         self.stopThread()
         # must do this at last
         self._executor.killProcess()
+
+        if self._bufhidden == "hide":
+            lfCmd("noautocmd bwipe! {}".format(self._buffer.number))
 
     def suicide(self):
         self._owner.deregister(self)
@@ -1146,7 +1149,6 @@ class TreeView(GitCommandView):
 
     def cleanup(self):
         super(TreeView, self).cleanup()
-        lfCmd("bwipe {}".format(self._buffer.number))
 
         self._match_ids = []
 
@@ -1281,11 +1283,12 @@ class PreviewPanel(Panel):
 
 
 class DiffViewPanel(Panel):
-    def __init__(self):
+    def __init__(self, bufhidden_callback=None):
         self._views = {}
         self._hidden_views = {}
         # key is current tabpage
         self._buffer_names = {}
+        self._bufhidden_cb = bufhidden_callback
 
     def register(self, view):
         self._views[view.getBufferName()] = view
@@ -1309,8 +1312,8 @@ class DiffViewPanel(Panel):
         self._hidden_views[name] = view
         lfCmd("call win_execute({}, 'diffoff')".format(view.getWindowId()))
 
-        if len(self._views) == 0:
-            lfCmd("call timer_start(1, function('leaderf#Git#Cleanup', [{}]))".format(id(self)))
+        if self._bufhidden_cb is not None:
+            self._bufhidden_cb()
 
     def bufShown(self, buffer_name, winid):
         view = self._hidden_views[buffer_name]
@@ -1322,7 +1325,6 @@ class DiffViewPanel(Panel):
     def cleanup(self):
         for view in self._hidden_views.values():
             view.cleanup()
-            lfCmd("noautocmd bwipe! {}".format(view.getBufferNumber()))
         self._hidden_views = {}
 
         self._buffer_names = {}
@@ -1347,6 +1349,9 @@ class DiffViewPanel(Panel):
 
     def hasView(self):
         return vim.current.tabpage in self._buffer_names
+
+    def isAllHidden(self):
+        return len(self._views) == 0
 
     def create(self, arguments_dict, source, **kwargs):
         """
@@ -1425,11 +1430,21 @@ class DiffViewPanel(Panel):
 
 
 class NavigationPanel(Panel):
-    def __init__(self):
+    def __init__(self, bufhidden_callback=None):
         self.tree_view = None
+        self._bufhidden_cb = bufhidden_callback
+        self._is_hidden = False
 
     def register(self, view):
         self.tree_view = view
+
+    def bufHidden(self, view):
+        self._is_hidden = True
+        if self._bufhidden_cb is not None:
+            self._bufhidden_cb()
+
+    def isHidden(self):
+        return self._is_hidden
 
     def cleanup(self):
         if self.tree_view is not None:
@@ -1454,8 +1469,8 @@ class NavigationPanel(Panel):
 class ExplorerPage(object):
     def __init__(self, project_root):
         self._project_root = project_root
-        self._navigation_panel = NavigationPanel()
-        self._diff_view_panel = DiffViewPanel()
+        self._navigation_panel = NavigationPanel(self.afterBufhidden)
+        self._diff_view_panel = DiffViewPanel(self.afterBufhidden)
         self._arguments = {}
         self._win_pos = None
         self.tabpage = None
@@ -1521,9 +1536,13 @@ class ExplorerPage(object):
         if source is not None:
             self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
 
+    def afterBufhidden(self):
+        if self._navigation_panel.isHidden() and self._diff_view_panel.isAllHidden():
+            lfCmd("call timer_start(1, function('leaderf#Git#Cleanup', [{}]))".format(id(self)))
+
     def cleanup(self):
-        if self._navigation_panel is not None:
-            self._navigation_panel.cleanup()
+        self._navigation_panel.cleanup()
+        self._diff_view_panel.cleanup()
 
     def open(self, recursive, **kwargs):
         source = self._navigation_panel.tree_view.expandOrCollapseFolder(recursive)
@@ -1733,12 +1752,16 @@ class GitExplManager(Manager):
 class GitDiffExplManager(GitExplManager):
     def __init__(self):
         super(GitDiffExplManager, self).__init__()
-        self._diff_view_panel = DiffViewPanel()
+        self._diff_view_panel = DiffViewPanel(self.afterBufhidden)
 
     def _getExplorer(self):
         if self._explorer is None:
             self._explorer = GitDiffExplorer()
         return self._explorer
+
+    def afterBufhidden(self):
+        if self._diff_view_panel.isAllHidden():
+            lfCmd("call timer_start(1, function('leaderf#Git#Cleanup', [{}]))".format(id(self)))
 
     def getSource(self, line):
         """
@@ -1790,8 +1813,6 @@ class GitDiffExplManager(GitExplManager):
         elif "--explorer" in self._arguments:
             pass
         else:
-            # cleanup the cache when starting
-            self._diff_view_panel.cleanup()
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)
 
     def _afterEnter(self):
@@ -1849,6 +1870,9 @@ class GitDiffExplManager(GitExplManager):
 
             if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
                 tabmove()
+
+    def cleanup(self):
+        self._diff_view_panel.cleanup()
 
 
 class GitLogExplManager(GitExplManager):
@@ -1952,9 +1976,9 @@ class GitLogExplManager(GitExplManager):
     def cleanup(self):
         for k, v in self._pages.items():
             if v.tabpage not in vim.tabpages:
-                v.cleanup()
                 del self._pages[k]
                 return
+
 
 #*****************************************************
 # gitExplManager is a singleton
