@@ -26,6 +26,12 @@ from .devicons import (
     matchaddDevIconsExtension,
 )
 
+def lfGetFilePath(source):
+    """
+    source is a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
+    """
+    return source[3] if source[4] == "" else source[4]
+
 #*****************************************************
 # GitExplorer
 #*****************************************************
@@ -184,7 +190,7 @@ class GitDiffCommand(GitCommand):
             extra_options += " " + " ".join(self._arguments["extra"])
 
         if self._source is not None:
-            file_name = self._source[3] if self._source[4] == "" else self._source[4]
+            file_name = lfGetFilePath(self._source)
             if " " in file_name:
                 file_name = file_name.replace(' ', r'\ ')
             extra_options += " -- {}".format(file_name)
@@ -744,8 +750,7 @@ class TreeView(GitCommandView):
     def appendFiles(self, parent, level, tree_node):
         for k, v in tree_node.files.items():
             self._file_structures[parent].append(
-                    MetaInfo(level, False, k, v,
-                             v[3] if v[4] == "" else v[4])
+                    MetaInfo(level, False, k, v, lfGetFilePath(v))
                     )
 
     def getLeftMostFile(self, tree_node):
@@ -793,7 +798,7 @@ class TreeView(GitCommandView):
         elif line.startswith(":"):
             parent, tree_node = self._trees.last_key_value()
             mode, source = self.generateSource(line)
-            file_path = source[3] if source[4] == "" else source[4]
+            file_path = lfGetFilePath(source)
             if mode == "160000": # gitlink
                 directories = file_path.split("/")
             else:
@@ -888,7 +893,7 @@ class TreeView(GitCommandView):
                 yield from self.metaInfoGenerator(info, recursive, level + 1)
 
         for k, v in tree_node.files.items():
-            yield MetaInfo(meta_info.level + 1, False, k, v, v[3] if v[4] == "" else v[4])
+            yield MetaInfo(meta_info.level + 1, False, k, v, lfGetFilePath(v))
 
     def expandOrCollapseFolder(self, recursive=False):
         with self._lock:
@@ -1354,9 +1359,9 @@ class DiffViewPanel(Panel):
         """
         source is a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
         """
-        file_name = source[4] if source[4] != "" else source[3]
+        file_path = lfGetFilePath(source)
         sources = ((source[0], source[2], source[3]),
-                   (source[1], source[2], file_name))
+                   (source[1], source[2], file_path))
         buffer_names = (GitCatFileCommand.buildBufferName(sources[0]),
                         GitCatFileCommand.buildBufferName(sources[1]))
         if buffer_names[0] in self._views and buffer_names[1] in self._views:
