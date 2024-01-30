@@ -430,7 +430,6 @@ class GitCommandView(object):
         self.initBuffer()
         self.start()
 
-
     def writeBuffer(self):
         if self._read_finished == 2:
             return
@@ -482,13 +481,13 @@ class GitCommandView(object):
             lfCmd("call timer_stop(%s)" % self._timer_id)
             self._timer_id = None
 
-    def cleanup(self):
+    def cleanup(self, wipe=True):
         self.stopTimer()
         self.stopThread()
         # must do this at last
         self._executor.killProcess()
 
-        if self._bufhidden == "hide":
+        if self._bufhidden == "hide" and wipe == True:
             lfCmd("noautocmd bwipe! {}".format(self._buffer.number))
 
     def suicide(self):
@@ -1297,13 +1296,11 @@ class DiffViewPanel(Panel):
         # :bw
         name = view.getBufferName()
         if name in self._views:
-            self._views[name].cleanup()
+            self._views[name].cleanup(wipe=False)
             del self._views[name]
-            if len(self._views) == 0:
-                self.cleanup()
 
         if name in self._hidden_views:
-            self._hidden_views[name].cleanup()
+            self._hidden_views[name].cleanup(wipe=False)
             del self._hidden_views[name]
 
     def bufHidden(self, view):
