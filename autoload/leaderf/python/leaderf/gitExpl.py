@@ -1117,8 +1117,18 @@ class TreeView(GitCommandView):
                 structure = self._file_structures[self._cur_parent]
                 cur_len = len(structure)
                 if cur_len > self._offset_in_content:
-                    self._buffer.append([self.buildLine(info)
-                                         for info in structure[self._offset_in_content:cur_len]])
+                    window = None
+                    cursorline = 0
+                    win_num = int(lfEval("bufwinnr({}+0)".format(self._buffer.number)))
+                    if win_num != -1:
+                        window = vim.windows[win_num]
+                        cursorline = window.cursor[0]
+
+                    for info in structure[self._offset_in_content:cur_len]:
+                        self._buffer.append(self.buildLine(info))
+                        if cursorline == 1 and not info.is_dir:
+                            cursorline = len(self._buffer)
+                            lfCmd("call win_execute({}, 'norm! {}G')".format(self.getWindowId(), cursorline))
 
                     self._offset_in_content = cur_len
                     lfCmd("redraw")
