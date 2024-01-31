@@ -912,6 +912,9 @@ class TreeView(GitCommandView):
             if meta_info.is_dir:
                 if meta_info.info.status == FolderStatus.CLOSED:
                     self.expandFolder(line_num, index, meta_info, recursive)
+                elif recursive == True:
+                    self.collapseFolder(line_num, index, meta_info, recursive)
+                    self.expandFolder(line_num, index, meta_info, recursive)
                 else:
                     self.collapseFolder(line_num, index, meta_info, recursive)
                 return None
