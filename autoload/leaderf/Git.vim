@@ -55,8 +55,6 @@ function! leaderf#Git#OuterIndent(direction)
     endif
     call search(printf('^\s\{,%d}\zs\S', width-1), flags)
 endfunction
-nnoremap <silent> - :call OuterIndent(0)<CR>
-nnoremap <silent> + :call OuterIndent(1)<CR>
 
 function! leaderf#Git#SpecificMaps(id)
     exec g:Lf_py "import ctypes"
@@ -82,6 +80,7 @@ function! leaderf#Git#ExplorerMaps(id)
     exec printf('nnoremap <buffer> <silent> O             :exec g:Lf_py "%s.open(True)"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> t             :exec g:Lf_py "%s.open(True, mode=''t'')"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> p             :exec g:Lf_py "%s.open(True, preview=True)"<CR>', explorer_page)
+    nnoremap <buffer> <silent> q             :q<CR>
 endfunction
 
 function! leaderf#Git#TimerCallback(manager_id, id)
