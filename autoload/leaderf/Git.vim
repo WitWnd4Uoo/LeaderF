@@ -49,11 +49,22 @@ function! leaderf#Git#OuterIndent(direction)
         return
     endif
     if a:direction == 0
-        let flags = 'sbw'
+        let flags = 'sbW'
     else
-        let flags = 'sw'
+        let flags = 'sW'
     endif
     call search(printf('^\s\{,%d}\zs\S', width-1), flags)
+endfunction
+
+function! leaderf#Git#SameIndent(direction)
+    let spaces = substitute(getline('.'), '^\(\s*\).*', '\1', '')
+    let width = strdisplaywidth(spaces)
+    if a:direction == 0
+        let flags = 'sbW'
+    else
+        let flags = 'sW'
+    endif
+    call search(printf('^\s\{%d}\zs\S', width), flags)
 endfunction
 
 function! leaderf#Git#SpecificMaps(id)
@@ -69,6 +80,8 @@ function! leaderf#Git#TreeViewMaps(id)
     exec printf('command! -bar LeaderfGitFind exec g:Lf_py "%s.locateFile(''aa'')"', tree_view)
     nnoremap <buffer> <silent> K             :call leaderf#Git#OuterIndent(0)<CR>
     nnoremap <buffer> <silent> J             :call leaderf#Git#OuterIndent(1)<CR>
+    nnoremap <buffer> <silent> <C-K>         :call leaderf#Git#SameIndent(0)<CR>
+    nnoremap <buffer> <silent> <C-J>         :call leaderf#Git#SameIndent(1)<CR>
 endfunction
 
 function! leaderf#Git#ExplorerMaps(id)
