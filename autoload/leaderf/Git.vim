@@ -39,6 +39,25 @@ function! leaderf#Git#Maps(id)
     exec printf('nnoremap <buffer> <silent> <Esc>         :exec g:Lf_py "%s.closePreviewPopupOrQuit()"<CR>', manager)
 endfunction
 
+" direction:
+"   0, backward
+"   1, forward
+function! leaderf#Git#OuterIndent(direction)
+    let spaces = substitute(getline('.'), '^\(\s*\).*', '\1', '')
+    let width = strdisplaywidth(spaces)
+    if width == 0
+        return
+    endif
+    if a:direction == 0
+        let flags = 'sbw'
+    else
+        let flags = 'sw'
+    endif
+    call search(printf('^\s\{,%d}\zs\S', width-1), flags)
+endfunction
+nnoremap <silent> - :call OuterIndent(0)<CR>
+nnoremap <silent> + :call OuterIndent(1)<CR>
+
 function! leaderf#Git#SpecificMaps(id)
     exec g:Lf_py "import ctypes"
     let manager = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
@@ -50,6 +69,8 @@ function! leaderf#Git#TreeViewMaps(id)
     let tree_view = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
     exec printf('nnoremap <silent> <C-G>             :exec g:Lf_py "%s.locateFile(''aa'')"<CR>', tree_view)
     exec printf('command! -bar LeaderfGitFind exec g:Lf_py "%s.locateFile(''aa'')"', tree_view)
+    nnoremap <buffer> <silent> K             :call leaderf#Git#OuterIndent(0)<CR>
+    nnoremap <buffer> <silent> J             :call leaderf#Git#OuterIndent(1)<CR>
 endfunction
 
 function! leaderf#Git#ExplorerMaps(id)

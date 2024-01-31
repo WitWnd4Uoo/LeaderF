@@ -341,7 +341,6 @@ class GitCommandView(object):
 
     def getWindowId(self):
         if lfEval("win_id2tabwin({})".format(self._window_id)) == ['0', '0']:
-            # self._window_id = int(lfEval("get(win_findbuf({}), 0, -1)".format(self._buffer.number)))
             self._window_id = int(lfEval("bufwinid('{}')".format(escQuote(self._buffer.name))))
         return self._window_id
 
@@ -1123,16 +1122,12 @@ class TreeView(GitCommandView):
                 structure = self._file_structures[self._cur_parent]
                 cur_len = len(structure)
                 if cur_len > self._offset_in_content:
-                    cursor_line = 0
+                    cursor_line = int(lfEval("getcurpos({})[1]".format(self.getWindowId())))
                     init_line = len(self._head)
 
-                    win_num = int(lfEval("bufwinnr({}+0)".format(self._buffer.number)))
-                    if win_num != -1:
-                        cursor_line = vim.windows[win_num].cursor[0]
-
-                        if cursor_line <= init_line:
-                            lfCmd("call win_execute({}, 'norm! {}G')".format(self.getWindowId(), init_line))
-                            cursor_line = init_line
+                    if cursor_line <= init_line:
+                        lfCmd("call win_execute({}, 'norm! {}G')".format(self.getWindowId(), init_line))
+                        cursor_line = int(lfEval("getcurpos({})[1]".format(self.getWindowId())))
 
                     for info in structure[self._offset_in_content:cur_len]:
                         self._buffer.append(self.buildLine(info))
