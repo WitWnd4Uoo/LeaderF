@@ -46,14 +46,14 @@ function! leaderf#Git#OuterIndent(direction)
     let spaces = substitute(getline('.'), '^\(\s*\).*', '\1', '')
     let width = strdisplaywidth(spaces)
     if width == 0
-        return
+        return 0
     endif
     if a:direction == 0
         let flags = 'sbW'
     else
         let flags = 'sW'
     endif
-    call search(printf('^\s\{,%d}\zs\S', width-1), flags)
+    return search(printf('^\s\{,%d}\zs\S', width-1), flags)
 endfunction
 
 " direction:
@@ -104,14 +104,21 @@ endfunction
 function! leaderf#Git#TreeViewMaps(id)
     exec g:Lf_py "import ctypes"
     let tree_view = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
-    exec printf('nnoremap <silent> <C-G>             :exec g:Lf_py "%s.locateFile(''aa'')"<CR>', tree_view)
+    exec printf('nnoremap <silent> <C-G>     :exec g:Lf_py "%s.locateFile(''aa'')"<CR>', tree_view)
+    exec printf('nnoremap <silent> X         :exec g:Lf_py "%s.collapseChildren()"<CR>', tree_view)
     exec printf('command! -bar LeaderfGitFind exec g:Lf_py "%s.locateFile(''aa'')"', tree_view)
-    nnoremap <buffer> <silent> K             :call leaderf#Git#OuterIndent(0)<CR>
-    nnoremap <buffer> <silent> J             :call leaderf#Git#OuterIndent(1)<CR>
+    nnoremap <buffer> <silent> -             :call leaderf#Git#OuterIndent(0)<CR>
+    nnoremap <buffer> <silent> +             :call leaderf#Git#OuterIndent(1)<CR>
     nnoremap <buffer> <silent> <C-K>         :call leaderf#Git#SameIndent(0)<CR>
     nnoremap <buffer> <silent> <C-J>         :call leaderf#Git#SameIndent(1)<CR>
     nnoremap <buffer> <silent> (             :call leaderf#Git#OuterBlock(0)<CR>
     nnoremap <buffer> <silent> )             :call leaderf#Git#OuterBlock(1)<CR>
+endfunction
+
+function! leaderf#Git#CollapseParent(explorer_page)
+    if leaderf#Git#OuterIndent(0) != 0
+        exec g:Lf_py printf("%s.open(False)", a:explorer_page)
+    endif
 endfunction
 
 function! leaderf#Git#ExplorerMaps(id)
@@ -119,10 +126,11 @@ function! leaderf#Git#ExplorerMaps(id)
     let explorer_page = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
     exec printf('nnoremap <buffer> <silent> o             :exec g:Lf_py "%s.open(False)"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> <2-LeftMouse> :exec g:Lf_py "%s.open(False)"<CR>', explorer_page)
-    exec printf('nnoremap <buffer> <silent> <CR> :exec g:Lf_py "%s.open(False)"<CR>', explorer_page)
+    exec printf('nnoremap <buffer> <silent> <CR>          :exec g:Lf_py "%s.open(False)"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> O             :exec g:Lf_py "%s.open(True)"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> t             :exec g:Lf_py "%s.open(True, mode=''t'')"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> p             :exec g:Lf_py "%s.open(True, preview=True)"<CR>', explorer_page)
+    exec printf('nnoremap <buffer> <silent> x             :call leaderf#Git#CollapseParent("%s")<CR>', explorer_page)
     nnoremap <buffer> <silent> q             :q<CR>
 endfunction
 

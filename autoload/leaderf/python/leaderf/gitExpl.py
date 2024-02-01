@@ -875,7 +875,7 @@ class TreeView(GitCommandView):
         meta_info.info.status = FolderStatus.OPEN
 
         tree_node = meta_info.info
-        if len(tree_node.dirs) == 1 and len(tree_node.files) == 0:
+        if len(tree_node.dirs) == 1 and len(tree_node.files) == 0 and level != -1:
             node = tree_node
             while len(node.dirs) == 1 and len(node.files) == 0:
                 dir_name, node = node.dirs.last_key_value()
@@ -904,6 +904,11 @@ class TreeView(GitCommandView):
         with self._lock:
             line_num = vim.current.window.cursor[0]
             index = line_num - len(self._head) - 1
+            # the root
+            if index == -1 and recursive == True:
+                self.expandRoot(line_num)
+                return None
+
             structure = self._file_structures[self._cur_parent]
             if index < 0 or index >= len(structure):
                 return None
@@ -921,6 +926,46 @@ class TreeView(GitCommandView):
             else:
                 return meta_info.info
 
+    def collapseChildren(self):
+        with self._lock:
+            line_num = vim.current.window.cursor[0]
+            index = line_num - len(self._head) - 1
+            structure = self._file_structures[self._cur_parent]
+            if index < -1 or index >= len(structure):
+                return
+
+            # the root
+            if index == -1:
+                level = -1
+            else:
+                meta_info = structure[index]
+                if not meta_info.is_dir:
+                    return
+
+                level = meta_info.level
+
+            index += 1
+            line_num += 1
+            while index < len(structure) and structure[index].level > level and structure[index].is_dir:
+                if structure[index].info.status == FolderStatus.OPEN:
+                    self.collapseFolder(line_num, index, structure[index], False)
+                index += 1
+                line_num += 1
+
+    def expandRoot(self, line_num):
+        meta_info = MetaInfo(-1, True, "", self._trees[self._cur_parent], "")
+        self._file_structures[self._cur_parent] = list(self.metaInfoGenerator(meta_info, True, -1))
+        self._buffer.options['modifiable'] = True
+        structure = self._file_structures[self._cur_parent]
+        try:
+            increment = len(structure)
+            self._buffer[line_num:] = [self.buildLine(info) for info in structure]
+            self._offset_in_content = increment
+        finally:
+            self._buffer.options['modifiable'] = False
+
+        return increment
+
     def expandFolder(self, line_num, index, meta_info, recursive):
         structure = self._file_structures[self._cur_parent]
         size = len(structure)
@@ -928,7 +973,8 @@ class TreeView(GitCommandView):
         self._buffer.options['modifiable'] = True
         try:
             increment = len(structure) - size
-            self._buffer[line_num - 1] = self.buildLine(structure[index])
+            if index >= 0:
+                self._buffer[line_num - 1] = self.buildLine(structure[index])
             self._buffer.append([self.buildLine(info)
                                  for info in structure[index + 1 : index + 1 + increment]],
                                 line_num)
