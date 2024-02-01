@@ -56,6 +56,9 @@ function! leaderf#Git#OuterIndent(direction)
     call search(printf('^\s\{,%d}\zs\S', width-1), flags)
 endfunction
 
+" direction:
+"   0, backward
+"   1, forward
 function! leaderf#Git#SameIndent(direction)
     let spaces = substitute(getline('.'), '^\(\s*\).*', '\1', '')
     let width = strdisplaywidth(spaces)
@@ -64,13 +67,38 @@ function! leaderf#Git#SameIndent(direction)
     else
         let flags = 'sW'
     endif
-    call search(printf('^\s\{%d}\zs\S', width), flags)
+    if width == 0
+        let stopline = 0
+    else
+        let stopline = search(printf('^\s\{,%d}\zs\S', width-1), flags[1:].'n')
+    endif
+
+    noautocmd norm! ^
+    call search(printf('^\s\{%d}\zs\S', width), flags, stopline)
 endfunction
 
 function! leaderf#Git#SpecificMaps(id)
     exec g:Lf_py "import ctypes"
     let manager = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
-    exec printf('nnoremap <buffer> <silent> e             :exec g:Lf_py "%s.editCommand()"<CR>', manager)
+    exec printf('nnoremap <buffer> <silent> e :exec g:Lf_py "%s.editCommand()"<CR>', manager)
+endfunction
+
+" direction:
+"   0, backward
+"   1, forward
+function! leaderf#Git#OuterBlock(direction)
+    let column = col('.')
+    if column >= match(getline('.'), '\S') + 1
+        noautocmd norm! ^
+        let column = col('.') - 1
+    endif
+    let width = (column - 1) / 2 * 2
+    if a:direction == 0
+        let flags = 'sbW'
+    else
+        let flags = 'sW'
+    endif
+    call search(printf('^\s\{%d}\zs\S', width), flags)
 endfunction
 
 function! leaderf#Git#TreeViewMaps(id)
@@ -82,6 +110,8 @@ function! leaderf#Git#TreeViewMaps(id)
     nnoremap <buffer> <silent> J             :call leaderf#Git#OuterIndent(1)<CR>
     nnoremap <buffer> <silent> <C-K>         :call leaderf#Git#SameIndent(0)<CR>
     nnoremap <buffer> <silent> <C-J>         :call leaderf#Git#SameIndent(1)<CR>
+    nnoremap <buffer> <silent> (             :call leaderf#Git#OuterBlock(0)<CR>
+    nnoremap <buffer> <silent> )             :call leaderf#Git#OuterBlock(1)<CR>
 endfunction
 
 function! leaderf#Git#ExplorerMaps(id)
