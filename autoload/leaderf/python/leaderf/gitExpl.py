@@ -1563,19 +1563,24 @@ class ExplorerPage(object):
 
     def splitWindow(self, win_pos):
         if win_pos == 'top':
-            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.7 - 3)")))
+            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
+            height = int(lfEval("&lines")) - height - 4
             lfCmd("silent! noa keepa keepj bel {}sp".format(height))
         elif win_pos == 'bottom':
-            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.7 - 3)")))
+            height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
+            height = int(lfEval("&lines")) - height - 4
             lfCmd("silent! noa keepa keepj abo {}sp".format(height))
         elif win_pos == 'left':
-            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.8)")))
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
+            width = int(lfEval("&columns")) - width + 1
             lfCmd("silent! noa keepa keepj bel {}vsp".format(width))
         elif win_pos == 'right':
-            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.8)")))
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
+            width = int(lfEval("&columns")) - width - 1
             lfCmd("silent! noa keepa keepj abo {}vsp".format(width))
         else: # left
-            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.8)")))
+            width = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelWidth', &columns * 0.2)")))
+            width = int(lfEval("&columns")) - width + 1
             lfCmd("silent! noa keepa keepj bel {}vsp".format(width))
 
         return int(lfEval("win_getid()"))
