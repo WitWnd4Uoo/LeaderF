@@ -1838,6 +1838,9 @@ class GitDiffExplManager(GitExplManager):
         """
         return a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
         """
+        if line == '':
+            return None
+
         file_name2 = ""
         if "\t=>\t" in line:
             # 'R050 hello world.txt\t=>\thello world2.txt'
@@ -1963,6 +1966,9 @@ class GitLogExplManager(GitExplManager):
         """
         return the hash
         """
+        if line == '':
+            return None
+
         return line.split(None, 1)[0]
 
     def _createPreviewWindow(self, config, source, line_num, jump_cmd):
