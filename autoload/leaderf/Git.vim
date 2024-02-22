@@ -196,3 +196,11 @@ function! leaderf#Git#NormalModeFilter(winid, key) abort
 
     return 1
 endfunction
+
+function! leaderf#Git#DefineSyntax() abort
+    syntax region Lf_hl_gitStat start=/^---/ end=/^ \d\+ files changed,/
+    syn match Lf_hl_gitStatPath /^ \S*\(\s*|\s*\d\+\s*+*-*$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatNumber /\(^ \S*\s*|\s*\)\@<=\d\+\(\s*+*-*$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatPlus /\(^ \S*\s*|\s*\d\+\s*\)\@<=+*\(-*$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatMinus /\(^ \S*\s*|\s*\d\+\s*+*\)\@<=-*$/ display containedin=Lf_hl_gitStat contained
+endfunction

@@ -1949,6 +1949,8 @@ class GitDiffExplManager(GitExplManager):
 class GitLogExplManager(GitExplManager):
     def __init__(self):
         super(GitLogExplManager, self).__init__()
+        lfCmd("augroup Lf_Git | augroup END")
+        lfCmd("autocmd! Lf_Git FileType git call leaderf#Git#DefineSyntax()")
         # key is source, value is ExplorerPage
         self._pages = {}
 
