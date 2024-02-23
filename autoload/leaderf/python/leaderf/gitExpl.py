@@ -209,18 +209,19 @@ class GitDiffCommand(GitCommand):
 
 
 class GitCatFileCommand(GitCommand):
-    def __init__(self, arguments_dict, source):
+    def __init__(self, arguments_dict, source, commit_id):
         """
         source is a tuple like (b90f76fc1, R099, src/version.c)
         """
+        self._commit_id = commit_id
         super(GitCatFileCommand, self).__init__(arguments_dict, source)
 
     @staticmethod
-    def buildBufferName(source):
+    def buildBufferName(commit_id, source):
         """
         source is a tuple like (b90f76fc1, R099, src/version.c)
         """
-        return "{}:{}".format(source[0][:9], source[2])
+        return "{}:{}:{}".format(commit_id[:7], source[0][:9], source[2])
 
     def buildCommandAndBufferName(self):
         self._cmd = "git cat-file -p {}".format(self._source[0])
@@ -233,7 +234,7 @@ class GitCatFileCommand(GitCommand):
             else:
                 self._cmd = ""
 
-        self._buffer_name = GitCatFileCommand.buildBufferName(self._source)
+        self._buffer_name = GitCatFileCommand.buildBufferName(self._commit_id, self._source)
         self._file_type_cmd = "silent! doautocmd filetypedetect BufNewFile {}".format(self._source[2])
 
 
@@ -1351,7 +1352,8 @@ class PreviewPanel(Panel):
 
 
 class DiffViewPanel(Panel):
-    def __init__(self, bufhidden_callback=None):
+    def __init__(self, bufhidden_callback=None, commit_id=""):
+        self._commit_id = commit_id
         self._views = {}
         self._hidden_views = {}
         # key is current tabpage
@@ -1426,15 +1428,15 @@ class DiffViewPanel(Panel):
         file_path = lfGetFilePath(source)
         sources = ((source[0], source[2], source[3]),
                    (source[1], source[2], file_path))
-        buffer_names = (GitCatFileCommand.buildBufferName(sources[0]),
-                        GitCatFileCommand.buildBufferName(sources[1]))
+        buffer_names = (GitCatFileCommand.buildBufferName(self._commit_id, sources[0]),
+                        GitCatFileCommand.buildBufferName(self._commit_id, sources[1]))
         if buffer_names[0] in self._views and buffer_names[1] in self._views:
             win_ids = (self._views[buffer_names[0]].getWindowId(),
                        self._views[buffer_names[1]].getWindowId())
             lfCmd("call win_gotoid({})".format(win_ids[0]))
         elif buffer_names[0] in self._views:
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[0]].getWindowId()))
-            cmd = GitCatFileCommand(arguments_dict, sources[1])
+            cmd = GitCatFileCommand(arguments_dict, sources[1], self._commit_id)
             lfCmd("rightbelow vsp {}".format(cmd.getBufferName()))
             if buffer_names[1] in self._hidden_views:
                 self.bufShown(buffer_names[1], int(lfEval("win_getid()")))
@@ -1443,7 +1445,7 @@ class DiffViewPanel(Panel):
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[0]].getWindowId()))
         elif buffer_names[1] in self._views:
             lfCmd("call win_gotoid({})".format(self._views[buffer_names[1]].getWindowId()))
-            cmd = GitCatFileCommand(arguments_dict, sources[0])
+            cmd = GitCatFileCommand(arguments_dict, sources[0], self._commit_id)
             lfCmd("leftabove vsp {}".format(cmd.getBufferName()))
             if buffer_names[0] in self._hidden_views:
                 self.bufShown(buffer_names[0], int(lfEval("win_getid()")))
@@ -1471,7 +1473,7 @@ class DiffViewPanel(Panel):
                 win_ids = [int(lfEval("bufwinid('{}')".format(escQuote(name)))) for name in buffer_names]
                 win_ids = self.getValidWinIDs(win_ids)
 
-            cat_file_cmds = [GitCatFileCommand(arguments_dict, s) for s in sources]
+            cat_file_cmds = [GitCatFileCommand(arguments_dict, s, self._commit_id) for s in sources]
             outputs = [None, None]
             if (cat_file_cmds[0].getBufferName() not in self._hidden_views
                 and cat_file_cmds[1].getBufferName() not in self._hidden_views):
@@ -1533,10 +1535,10 @@ class NavigationPanel(Panel):
 
 
 class ExplorerPage(object):
-    def __init__(self, project_root):
+    def __init__(self, project_root, commit_id):
         self._project_root = project_root
         self._navigation_panel = NavigationPanel(self.afterBufhidden)
-        self._diff_view_panel = DiffViewPanel(self.afterBufhidden)
+        self._diff_view_panel = DiffViewPanel(self.afterBufhidden, commit_id)
         self._arguments = {}
         self._win_pos = None
         self.tabpage = None
@@ -1589,14 +1591,14 @@ class ExplorerPage(object):
         lfCmd("call win_execute({}, 'call leaderf#Git#ExplorerMaps({})')"
               .format(winid, id(self)))
 
-    def create(self, arguments_dict, source):
+    def create(self, arguments_dict, commit_id):
         self._arguments = arguments_dict
         lfCmd("noautocmd tabnew")
 
         self.tabpage = vim.current.tabpage
         diff_view_winid = int(lfEval("win_getid()"))
 
-        cmd = GitLogExplCommand(arguments_dict, source)
+        cmd = GitLogExplCommand(arguments_dict, commit_id)
         win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
         winid = self._createWindow(win_pos, cmd.getBufferName())
 
@@ -2038,7 +2040,7 @@ class GitLogExplManager(GitExplManager):
                 lfCmd("autocmd! Lf_Git TabClosed * call leaderf#Git#CleanupExplorerPage({})"
                       .format(id(self)))
 
-                self._pages[source] = ExplorerPage(self._project_root)
+                self._pages[source] = ExplorerPage(self._project_root, source)
                 self._pages[source].create(self._arguments, source)
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
