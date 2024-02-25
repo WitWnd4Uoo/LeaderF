@@ -601,6 +601,7 @@ class TreeView(GitCommandView):
         self._file_structures = {}
         # to protect self._file_structures
         self._lock = threading.Lock()
+        self._file_list = {}
         self._cur_parent = None
         self._short_stat = {}
         self._num_stat = {}
@@ -801,10 +802,16 @@ class TreeView(GitCommandView):
                 self._cur_parent = parent
             self._trees[parent] = TreeNode()
             self._file_structures[parent] = []
+            self._file_list[parent] = []
         elif line.startswith(":"):
             parent, tree_node = self._trees.last_key_value()
             mode, source = self.generateSource(line)
             file_path = lfGetFilePath(source)
+            self._file_list[parent].append("{:<4} {}{}"
+                                           .format(source[2], source[3],
+                                                   "" if source[4] == ""
+                                                   else "\t=>\t" + source[4])
+                                           )
             if mode == "160000": # gitlink
                 directories = file_path.split("/")
             else:
@@ -1831,6 +1838,12 @@ class GitDiffExplManager(GitExplManager):
         if self._explorer is None:
             self._explorer = GitDiffExplorer()
         return self._explorer
+
+    def _getDigest(self, line, mode):
+        return line.split(None, 1)[1]
+
+    def _getDigestStartPos(self, line, mode):
+        return 5
 
     def afterBufhidden(self):
         if self._diff_view_panel.isAllHidden():
