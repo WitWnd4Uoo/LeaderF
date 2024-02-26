@@ -78,10 +78,10 @@ class GitDiffExplorer(GitExplorer):
         self._source_info = {}
 
     def getContent(self, *args, **kwargs):
-        if "content" in kwargs:
-            return kwargs["content"]
-
         arguments_dict = kwargs.get("arguments", {})
+
+        if "content" in arguments_dict:
+            return arguments_dict["content"]
 
         executor = AsyncExecutor()
         self._executor.append(executor)
@@ -184,6 +184,20 @@ class GitDiffCommand(GitCommand):
         super(GitDiffCommand, self).__init__(arguments_dict, source)
 
     def buildCommandAndBufferName(self):
+        if "commit_id" in self._arguments and "parent" in self._arguments:
+            if not self._arguments["parent"].startswith("0000000"):
+                self._cmd = "git diff --no-color {}..{} -- {}".format(self._arguments["parent"],
+                                                                      self._arguments["commit_id"],
+                                                                      self._source
+                                                                      )
+            else:
+                self._cmd = "git show --pretty= --no-color {} -- {}".format(self._arguments["commit_id"],
+                                                                            self._source
+                                                                            )
+            self._buffer_name = "LeaderF://" + self._cmd
+            self._file_type_cmd = "silent! doautocmd filetypedetect BufNewFile *.diff"
+            return
+
         self._cmd = "git diff --no-color"
         extra_options = ""
         if "--cached" in self._arguments:
@@ -1046,11 +1060,6 @@ class TreeView(GitCommandView):
         return file in tree_node.files
 
     def locateFile(self, path):
-        # for test
-        # path = lfRelpath(vim.current.buffer.name, self._project_root)
-        path = lfRelpath(vim.current.buffer.name)
-
-
         with self._lock:
             self._locateFile(path)
 
@@ -1661,15 +1670,24 @@ class ExplorerPage(object):
             if kwargs.get("preview", False) == True:
                 lfCmd("call win_gotoid({})".format(self._navigation_panel.getWindowId()))
 
-    def fuzzySearch(self):
+    def locateFile(self, path):
+        self._navigation_panel.tree_view.locateFile(path)
+        self.open(False, preview=True)
+
+    def fuzzySearch(self, recall=False):
         if self._git_diff_manager is None:
             self._git_diff_manager = GitDiffExplManager()
 
-        kwargs = {
+        kwargs = {}
+        kwargs["arguments"] = {
                 "commit_id": self._commit_id,
                 "parent": self._navigation_panel.tree_view.getCurrentParent(),
-                "content": self._navigation_panel.tree_view.getFileList()
+                "content": self._navigation_panel.tree_view.getFileList(),
+                "accept": self.locateFile
                 }
+        if recall == True:
+            kwargs["arguments"]["--recall"] = []
+
         self._git_diff_manager.startExplorer("popup", **kwargs)
 
 
@@ -1889,6 +1907,9 @@ class GitDiffExplManager(GitExplManager):
             # 'M      runtime/syntax/nix.vim'
             file_name1 = line.split()[-1]
 
+        if "commit_id" in self._arguments and "parent" in self._arguments:
+            return file_name2 if file_name2 else file_name1
+
         return self._getExplorer().getSourceInfo()[(file_name1, file_name2)]
 
     def _createPreviewWindow(self, config, source, line_num, jump_cmd):
@@ -1970,6 +1991,8 @@ class GitDiffExplManager(GitExplManager):
 
         if "-s" in self._arguments:
             self._diff_view_panel.create(self._arguments, source, **kwargs)
+        elif "accept" in self._arguments:
+            self._arguments["accept"](source)
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
                 lfCmd("tabnew")

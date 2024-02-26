@@ -132,6 +132,7 @@ function! leaderf#Git#ExplorerMaps(id)
     exec printf('nnoremap <buffer> <silent> p             :exec g:Lf_py "%s.open(True, preview=True)"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> x             :call leaderf#Git#CollapseParent("%s")<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> f             :exec g:Lf_py "%s.fuzzySearch()"<CR>', explorer_page)
+    exec printf('nnoremap <buffer> <silent> F             :exec g:Lf_py "%s.fuzzySearch(True)"<CR>', explorer_page)
     nnoremap <buffer> <silent> q             :q<CR>
 endfunction
 
@@ -202,9 +203,11 @@ function! leaderf#Git#DefineSyntax() abort
     syntax region Lf_hl_gitStat start=/^---$/ end=/^ \d\+ files\? changed,/
     syn match Lf_hl_gitStatPath /^ \S*\%(\s*|\s*\d\+\s*+*-*$\)\@=/ display containedin=Lf_hl_gitStat contained
     syn match Lf_hl_gitStatPath /^ \S*\%(\s*|\s*Bin \d\+ -> \d\+ bytes\?$\)\@=/ display containedin=Lf_hl_gitStat contained
-    syn match Lf_hl_gitStatNumber /\%(^ \S*\s*|\s*\)\@<=\d\+\%(\s*+*-*$\)\@=/ display containedin=Lf_hl_gitStat contained
-    syn match Lf_hl_gitStatNumber /\%(^ \S*\s*|\s*Bin \)\@<=\d\+ -> \d\+\%( bytes\?$\)\@=/ display containedin=Lf_hl_gitStat contained
-    syn match Lf_hl_gitStatPlus /\%(^ \S*\s*|\s*\d\+\s*\)\@<=+*\%(-*$\)\@=/ display containedin=Lf_hl_gitStat contained
-    syn match Lf_hl_gitStatMinus /\%(^ \S*\s*|\s*\d\+\s*+*\)\@<=-*$/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatPath /^ \S*\%( => \S*\s*|\s*\d\+\s*+*-*$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatPath /\%(^ \S* => \)\@<=\S*\%(\s*|\s*\d\+\s*+*-*$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatNumber /\%(^ \S*\%( => \S*\)\?\s*|\s*\)\@<=\d\+\%(\s*+*-*$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatNumber /\%(^ \S*\%( => \S*\)\?\s*|\s*Bin \)\@<=\d\+ -> \d\+\%( bytes\?$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatPlus /\%(^ \S*\%( => \S*\)\?\s*|\s*\d\+\s*\)\@<=+*\%(-*$\)\@=/ display containedin=Lf_hl_gitStat contained
+    syn match Lf_hl_gitStatMinus /\%(^ \S*\%( => \S*\)\?\s*|\s*\d\+\s*+*\)\@<=-*$/ display containedin=Lf_hl_gitStat contained
     syn match gitIdentityHeader /^Committer:/ contained containedin=gitHead nextgroup=gitIdentity skipwhite contains=@NoSpell
 endfunction
