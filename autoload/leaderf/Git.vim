@@ -131,6 +131,7 @@ function! leaderf#Git#ExplorerMaps(id)
     exec printf('nnoremap <buffer> <silent> t             :exec g:Lf_py "%s.open(True, mode=''t'')"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> p             :exec g:Lf_py "%s.open(True, preview=True)"<CR>', explorer_page)
     exec printf('nnoremap <buffer> <silent> x             :call leaderf#Git#CollapseParent("%s")<CR>', explorer_page)
+    exec printf('nnoremap <buffer> <silent> f             :exec g:Lf_py "%s.fuzzySearch()"<CR>', explorer_page)
     nnoremap <buffer> <silent> q             :q<CR>
 endfunction
 

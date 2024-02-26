@@ -78,6 +78,9 @@ class GitDiffExplorer(GitExplorer):
         self._source_info = {}
 
     def getContent(self, *args, **kwargs):
+        if "content" in kwargs:
+            return kwargs["content"]
+
         arguments_dict = kwargs.get("arguments", {})
 
         executor = AsyncExecutor()
@@ -694,6 +697,12 @@ class TreeView(GitCommandView):
                 self._first_source[parent] = source
 
             return source
+
+    def getCurrentParent(self):
+        return self._cur_parent
+
+    def getFileList(self):
+        return self._file_list[self._cur_parent]
 
     def generateSource(self, line):
         """
@@ -1546,9 +1555,11 @@ class ExplorerPage(object):
         self._project_root = project_root
         self._navigation_panel = NavigationPanel(self.afterBufhidden)
         self._diff_view_panel = DiffViewPanel(self.afterBufhidden, commit_id)
+        self._commit_id = commit_id
         self._arguments = {}
         self._win_pos = None
         self.tabpage = None
+        self._git_diff_manager = None
 
     def _createWindow(self, win_pos, buffer_name):
         self._win_pos = win_pos
@@ -1649,6 +1660,17 @@ class ExplorerPage(object):
 
             if kwargs.get("preview", False) == True:
                 lfCmd("call win_gotoid({})".format(self._navigation_panel.getWindowId()))
+
+    def fuzzySearch(self):
+        if self._git_diff_manager is None:
+            self._git_diff_manager = GitDiffExplManager()
+
+        kwargs = {
+                "commit_id": self._commit_id,
+                "parent": self._navigation_panel.tree_view.getCurrentParent(),
+                "content": self._navigation_panel.tree_view.getFileList()
+                }
+        self._git_diff_manager.startExplorer("popup", **kwargs)
 
 
 #*****************************************************
