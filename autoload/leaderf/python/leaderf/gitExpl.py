@@ -289,7 +289,7 @@ class GitLogCommand(GitCommand):
                          ' %cd{}%n%n%s%n%n%b%n" --stat=70 --stat-graph-width=10 -p --no-color'
                          ).format(self._source, sep)
 
-            if "--recall" in self._arguments:
+            if "--recall" in self._arguments and "current_file" in self._arguments:
                 file_name = self._arguments["current_file"]
                 self._cmd += " -- {}".format(lfRelpath(file_name))
             elif ("--current-file" in self._arguments
@@ -1081,7 +1081,7 @@ class TreeView(GitCommandView):
 
     def locateFile(self, path):
         with self._lock:
-            self._locateFile(path)
+            self._locateFile(lfRelpath(path))
 
     @staticmethod
     def getDirName(path):
@@ -1656,6 +1656,9 @@ class ExplorerPage(object):
         source = self._navigation_panel.getFirstSource()
         if source is not None:
             self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
+
+        # if "current_file" in arguments_dict:
+        #     self.locateFile(arguments_dict["current_file"])
 
     def afterBufhidden(self):
         if self._navigation_panel.isHidden() and self._diff_view_panel.isAllHidden():
