@@ -288,6 +288,16 @@ class GitLogCommand(GitCommand):
                          'Author:     %an <%ae>%nAuthorDate: %ad%nCommitter:  %cn <%ce>%nCommitDate:'
                          ' %cd{}%n%n%s%n%n%b%n" --stat=70 --stat-graph-width=10 -p --no-color'
                          ).format(self._source, sep)
+
+            if ("--current-file" in self._arguments
+                and vim.current.buffer.name
+                and not vim.current.buffer.options['bt']
+               ):
+                file_name = vim.current.buffer.name
+                if " " in file_name:
+                    file_name = file_name.replace(' ', r'\ ')
+                self._cmd += " -- {}".format(lfRelpath(file_name))
+
             self._buffer_name = "LeaderF://" + self._source
 
         self._file_type = "git"
@@ -1319,7 +1329,7 @@ class ResultPanel(Panel):
         if buffer_name in self._views and self._views[buffer_name].valid():
             self._views[buffer_name].create(-1, buf_content=content)
         else:
-            winid = self._createWindow(cmd.getArguments().get("--position", [""])[0], buffer_name)
+            winid = self._createWindow(cmd.getArguments().get("--position", ["top"])[0], buffer_name)
             GitCommandView(self, cmd).create(winid, buf_content=content)
 
     def writeBuffer(self):
