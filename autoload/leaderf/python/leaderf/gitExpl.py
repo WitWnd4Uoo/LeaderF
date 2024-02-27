@@ -289,7 +289,10 @@ class GitLogCommand(GitCommand):
                          ' %cd{}%n%n%s%n%n%b%n" --stat=70 --stat-graph-width=10 -p --no-color'
                          ).format(self._source, sep)
 
-            if ("--current-file" in self._arguments
+            if "--recall" in self._arguments:
+                file_name = self._arguments["current_file"]
+                self._cmd += " -- {}".format(lfRelpath(file_name))
+            elif ("--current-file" in self._arguments
                 and vim.current.buffer.name
                 and not vim.current.buffer.options['bt']
                ):
@@ -2073,6 +2076,14 @@ class GitLogExplManager(GitExplManager):
         arguments_dict = kwargs.get("arguments", {})
         if "--recall" not in arguments_dict:
             self.setArguments(arguments_dict)
+            if ("--current-file" in arguments_dict
+                and vim.current.buffer.name
+                and not vim.current.buffer.options['bt']
+               ):
+                file_name = vim.current.buffer.name
+                if " " in file_name:
+                    file_name = file_name.replace(' ', r'\ ')
+                self._arguments["current_file"] = file_name
 
         if "--recall" in arguments_dict:
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)
