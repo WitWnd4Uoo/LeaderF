@@ -379,12 +379,10 @@ class GitCommandView(object):
         return self._cmd.getSource()
 
     def start(self):
-        # start a process, timer and thread
-        content = self._executor.execute(self._cmd.getCommand(), encoding=lfEval("&encoding"))
-
+        # start a timer and thread
         self._timer_id = lfEval("timer_start(100, function('leaderf#Git#WriteBuffer', [%d]), {'repeat': -1})" % id(self))
 
-        self._reader_thread = threading.Thread(target=self._readContent, args=(content,))
+        self._reader_thread = threading.Thread(target=self._readContent, args=(lfEval("&encoding"),))
         self._reader_thread.daemon = True
         self._reader_thread.start()
 
@@ -483,8 +481,9 @@ class GitCommandView(object):
             self._owner.writeFinished(self.getWindowId())
             self.stopTimer()
 
-    def _readContent(self, content):
+    def _readContent(self, encoding):
         try:
+            content = self._executor.execute(self._cmd.getCommand(), encoding=encoding)
             for line in content:
                 self._content.append(line)
                 if self._stop_reader_thread:
@@ -1227,8 +1226,9 @@ class TreeView(GitCommandView):
             self._owner.writeFinished(self.getWindowId())
             self.stopTimer()
 
-    def _readContent(self, content):
+    def _readContent(self, encoding):
         try:
+            content = self._executor.execute(self._cmd.getCommand(), encoding=encoding)
             for line in content:
                 self.buildTree(line)
                 if self._stop_reader_thread:
