@@ -156,6 +156,7 @@ class GitCommand(object):
         self._arguments = arguments_dict
         self._source = source
         self._cmd = ""
+        self._file_type = ""
         self._file_type_cmd = ""
         self._buffer_name = ""
         self.buildCommandAndBufferName()
@@ -165,6 +166,9 @@ class GitCommand(object):
 
     def getCommand(self):
         return self._cmd
+
+    def getFileType(self):
+        return self._file_type
 
     def getFileTypeCommand(self):
         return self._file_type_cmd
@@ -195,6 +199,7 @@ class GitDiffCommand(GitCommand):
                                                                             self._source
                                                                             )
             self._buffer_name = "LeaderF://" + self._cmd
+            self._file_type = "diff"
             self._file_type_cmd = "silent! doautocmd filetypedetect BufNewFile *.diff"
             return
 
@@ -222,6 +227,7 @@ class GitDiffCommand(GitCommand):
 
         self._cmd += extra_options
         self._buffer_name = "LeaderF://git diff" + extra_options
+        self._file_type = "diff"
         self._file_type_cmd = "silent! doautocmd filetypedetect BufNewFile *.diff"
 
 
@@ -276,7 +282,6 @@ class GitLogCommand(GitCommand):
                 self._cmd += " -- {}".format(lfRelpath(file_name))
 
             self._buffer_name = "LeaderF://" + self._cmd
-            self._file_type_cmd = "setlocal filetype=git"
         else:
             sep = ' ' if os.name == 'nt' else ''
             self._cmd = ('git show {} --pretty=format:"commit %H%nparent %P%n'
@@ -284,7 +289,9 @@ class GitLogCommand(GitCommand):
                          ' %cd{}%n%n%s%n%n%b%n" --stat=70 --stat-graph-width=10 -p --no-color'
                          ).format(self._source, sep)
             self._buffer_name = "LeaderF://" + self._source
-            self._file_type_cmd = "setlocal filetype=git"
+
+        self._file_type = "git"
+        self._file_type_cmd = "setlocal filetype=git"
 
 
 class GitLogExplCommand(GitCommand):
@@ -394,7 +401,8 @@ class GitCommandView(object):
         lfCmd("call win_execute({}, 'setlocal noswapfile')".format(winid))
         lfCmd("call win_execute({}, 'setlocal nospell')".format(winid))
         lfCmd("call win_execute({}, 'setlocal nomodifiable')".format(winid))
-        lfCmd("call win_execute({}, '{}')".format(winid, self._cmd.getFileTypeCommand()))
+        if lfEval("getbufvar(winbufnr(%d), '&ft')" % winid) != self._cmd.getFileType():
+            lfCmd("call win_execute({}, '{}')".format(winid, self._cmd.getFileTypeCommand()))
 
     def initBuffer(self):
         pass
