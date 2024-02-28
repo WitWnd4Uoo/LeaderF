@@ -130,11 +130,8 @@ class GitLogExplorer(GitExplorer):
         self._executor.append(executor)
 
         cmd = 'git log --pretty=format:"%h%d %s"'
-        if ("--current-file" in arguments_dict
-            and vim.current.buffer.name
-            and not vim.current.buffer.options['bt']
-           ):
-            file_name = vim.current.buffer.name
+        if "--current-file" in arguments_dict and "current_file" in arguments_dict:
+            file_name = arguments_dict["current_file"]
             if " " in file_name:
                 file_name = file_name.replace(' ', r'\ ')
             cmd += " -- {}".format(file_name)
@@ -216,11 +213,8 @@ class GitDiffCommand(GitCommand):
             if " " in file_name:
                 file_name = file_name.replace(' ', r'\ ')
             extra_options += " -- {}".format(file_name)
-        elif ("--current-file" in self._arguments
-              and vim.current.buffer.name
-              and not vim.current.buffer.options['bt']
-             ):
-            file_name = vim.current.buffer.name
+        elif "--current-file" in self._arguments and "current_file" in self._arguments:
+            file_name = self._arguments["current_file"]
             if " " in file_name:
                 file_name = file_name.replace(' ', r'\ ')
             extra_options += " -- {}".format(lfRelpath(file_name))
@@ -272,11 +266,8 @@ class GitLogCommand(GitCommand):
             if "extra" in self._arguments:
                 self._cmd += " " + " ".join(self._arguments["extra"])
 
-            if ("--current-file" in self._arguments
-                and vim.current.buffer.name
-                and not vim.current.buffer.options['bt']
-               ):
-                file_name = vim.current.buffer.name
+            if "--current-file" in self._arguments and "current_file" in self._arguments:
+                file_name = self._arguments["current_file"]
                 if " " in file_name:
                     file_name = file_name.replace(' ', r'\ ')
                 self._cmd += " -- {}".format(lfRelpath(file_name))
@@ -292,11 +283,8 @@ class GitLogCommand(GitCommand):
             if "--recall" in self._arguments and "current_file" in self._arguments:
                 file_name = self._arguments["current_file"]
                 self._cmd += " -- {}".format(lfRelpath(file_name))
-            elif ("--current-file" in self._arguments
-                and vim.current.buffer.name
-                and not vim.current.buffer.options['bt']
-               ):
-                file_name = vim.current.buffer.name
+            if "--current-file" in self._arguments and "current_file" in self._arguments:
+                file_name = self._arguments["current_file"]
                 if " " in file_name:
                     file_name = file_name.replace(' ', r'\ ')
                 self._cmd += " -- {}".format(lfRelpath(file_name))
