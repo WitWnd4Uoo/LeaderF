@@ -283,7 +283,7 @@ class GitLogCommand(GitCommand):
             if "--recall" in self._arguments and "current_file" in self._arguments:
                 file_name = self._arguments["current_file"]
                 self._cmd += " -- {}".format(lfRelpath(file_name))
-            if "--current-file" in self._arguments and "current_file" in self._arguments:
+            elif "--current-file" in self._arguments and "current_file" in self._arguments:
                 file_name = self._arguments["current_file"]
                 if " " in file_name:
                     file_name = file_name.replace(' ', r'\ ')
@@ -302,6 +302,13 @@ class GitLogExplCommand(GitCommand):
     def buildCommandAndBufferName(self):
         self._cmd = ('git show -m --raw -C --numstat --shortstat '
                      '--pretty=format:"# %P" --no-abbrev {}').format(self._source)
+
+        if "--current-file" in self._arguments and "current_file" in self._arguments:
+            file_name = self._arguments["current_file"]
+            if " " in file_name:
+                file_name = file_name.replace(' ', r'\ ')
+            self._cmd += " -- {}".format(lfRelpath(file_name))
+
         self._buffer_name = "LeaderF://navigation/" + self._source
         self._file_type_cmd = ""
 
@@ -1643,9 +1650,6 @@ class ExplorerPage(object):
         source = self._navigation_panel.getFirstSource()
         if source is not None:
             self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
-
-        # if "current_file" in arguments_dict:
-        #     self.locateFile(arguments_dict["current_file"])
 
     def afterBufhidden(self):
         if self._navigation_panel.isHidden() and self._diff_view_panel.isAllHidden():
