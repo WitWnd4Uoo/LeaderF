@@ -842,6 +842,13 @@ class TreeView(GitCommandView):
             self._file_structures[parent] = []
             self._file_list[parent] = []
         elif line.startswith(":"):
+            if self._cur_parent is None:
+                parent = "0000000"
+                self._cur_parent = parent
+                self._trees[parent] = TreeNode()
+                self._file_structures[parent] = []
+                self._file_list[parent] = []
+
             parent, tree_node = self._trees.last_key_value()
             mode, source = self.generateSource(line)
             file_path = lfGetFilePath(source)
@@ -1633,14 +1640,13 @@ class ExplorerPage(object):
         lfCmd("call win_execute({}, 'call leaderf#Git#ExplorerMaps({})')"
               .format(winid, id(self)))
 
-    def create(self, arguments_dict, commit_id):
+    def create(self, arguments_dict, cmd):
         self._arguments = arguments_dict
         lfCmd("noautocmd tabnew")
 
         self.tabpage = vim.current.tabpage
         diff_view_winid = int(lfEval("win_getid()"))
 
-        cmd = GitLogExplCommand(arguments_dict, commit_id)
         win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
         winid = self._createWindow(win_pos, cmd.getBufferName())
 
@@ -1888,6 +1894,7 @@ class GitDiffExplManager(GitExplManager):
     def __init__(self):
         super(GitDiffExplManager, self).__init__()
         self._diff_view_panel = DiffViewPanel(self.afterBufhidden)
+        self._pages = set()
 
     def _getExplorer(self):
         if self._explorer is None:
@@ -1958,7 +1965,13 @@ class GitDiffExplManager(GitExplManager):
             self._result_panel.create(self.createGitCommand(self._arguments, None))
             self._restoreOrigCwd()
         elif "--explorer" in self._arguments:
-            pass
+            lfCmd("augroup Lf_Git | augroup END")
+            lfCmd("autocmd! Lf_Git TabClosed * call leaderf#Git#CleanupExplorerPage({})"
+                  .format(id(self)))
+
+            page = ExplorerPage(self._project_root, "")
+            page.create(arguments_dict, GitLogExplCommand(arguments_dict, ""))
+            self._pages.add(page)
         else:
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)
 
@@ -2122,7 +2135,8 @@ class GitLogExplManager(GitExplManager):
                       .format(id(self)))
 
                 self._pages[source] = ExplorerPage(self._project_root, source)
-                self._pages[source].create(self._arguments, source)
+                self._pages[source].create(self._arguments,
+                                           GitLogExplCommand(self._arguments, source))
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
                 lfCmd("tabnew")
