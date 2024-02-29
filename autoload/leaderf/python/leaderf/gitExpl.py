@@ -1354,7 +1354,9 @@ class ResultPanel(Panel):
         return self._sources
 
     def _createWindow(self, win_pos, buffer_name):
-        if win_pos == 'top':
+        if win_pos == 'tab':
+            lfCmd("silent! keepa keepj hide edit {}".format(buffer_name))
+        elif win_pos == 'top':
             lfCmd("silent! noa keepa keepj abo sp {}".format(buffer_name))
         elif win_pos == 'bottom':
             lfCmd("silent! noa keepa keepj bel sp {}".format(buffer_name))
@@ -1372,7 +1374,12 @@ class ResultPanel(Panel):
         if buffer_name in self._views and self._views[buffer_name].valid():
             self._views[buffer_name].create(-1, buf_content=content)
         else:
-            winid = self._createWindow(cmd.getArguments().get("--position", ["top"])[0], buffer_name)
+            arguments = cmd.getArguments()
+            if arguments.get("mode") == 't':
+                win_pos = 'tab'
+            else:
+                win_pos = arguments.get("--position", ["top"])[0]
+            winid = self._createWindow(win_pos, buffer_name)
             GitCommandView(self, cmd).create(winid, buf_content=content)
 
     def writeBuffer(self):
@@ -2070,7 +2077,10 @@ class GitDiffExplManager(GitExplManager):
             self._arguments["accept"](lfGetFilePath(source))
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
+                self._arguments["mode"] = 't'
                 lfCmd("tabnew")
+            else:
+                self._arguments["mode"] = ''
 
             tabpage_count = len(vim.tabpages)
 
