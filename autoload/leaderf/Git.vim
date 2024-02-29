@@ -163,7 +163,7 @@ endfunction
 
 function! leaderf#Git#CleanupExplorerPage(view_id)
     exec g:Lf_py "import ctypes"
-    exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.cleanup()", a:view_id)
+    exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.cleanupExplorerPage()", a:view_id)
 endfunction
 
 function! leaderf#Git#Commands()

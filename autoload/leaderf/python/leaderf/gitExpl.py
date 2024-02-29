@@ -185,15 +185,16 @@ class GitDiffCommand(GitCommand):
         super(GitDiffCommand, self).__init__(arguments_dict, source)
 
     def buildCommandAndBufferName(self):
+        # fuzzy search in navigation panel
         if "commit_id" in self._arguments and "parent" in self._arguments:
             if not self._arguments["parent"].startswith("0000000"):
                 self._cmd = "git diff --no-color {}..{} -- {}".format(self._arguments["parent"],
                                                                       self._arguments["commit_id"],
-                                                                      self._source
+                                                                      lfGetFilePath(self._source)
                                                                       )
             else:
                 self._cmd = "git show --pretty= --no-color {} -- {}".format(self._arguments["commit_id"],
-                                                                            self._source
+                                                                            lfGetFilePath(self._source)
                                                                             )
             self._buffer_name = "LeaderF://" + self._cmd
             self._file_type = "diff"
@@ -293,6 +294,31 @@ class GitLogCommand(GitCommand):
 
         self._file_type = "git"
         self._file_type_cmd = "setlocal filetype=git"
+
+
+class GitDiffExplCommand(GitCommand):
+    def __init__(self, arguments_dict, source):
+        super(GitDiffExplCommand, self).__init__(arguments_dict, source)
+
+    def buildCommandAndBufferName(self):
+        self._cmd = 'git diff --raw -C --numstat --shortstat --no-abbrev'
+        extra_options = ""
+        if "--cached" in self._arguments:
+            extra_options += " --cached"
+
+        if "extra" in self._arguments:
+            extra_options += " " + " ".join(self._arguments["extra"])
+
+        self._cmd += extra_options
+
+        # if "--current-file" in self._arguments and "current_file" in self._arguments:
+        #     file_name = self._arguments["current_file"]
+        #     if " " in file_name:
+        #         file_name = file_name.replace(' ', r'\ ')
+        #     self._cmd += " -- {}".format(lfRelpath(file_name))
+
+        self._buffer_name = "LeaderF://navigation/" + self._source
+        self._file_type_cmd = ""
 
 
 class GitLogExplCommand(GitCommand):
@@ -664,6 +690,10 @@ class TreeView(GitCommandView):
         self._match_ids = []
 
     def enableColor(self, winid):
+        if lfEval("hlexists('Lf_hl_help')") == '0':
+            lfCmd("call leaderf#colorscheme#popup#load('{}', '{}')".format("git",
+                    lfEval("get(g:, 'Lf_PopupColorscheme', 'default')")))
+
         lfCmd(r"""call win_execute({}, 'let matchid = matchadd(''Lf_hl_gitHelp'', ''^".*'', -100)')"""
               .format(winid))
         id = int(lfEval("matchid"))
@@ -1706,6 +1736,7 @@ class ExplorerPage(object):
                 "content": self._navigation_panel.tree_view.getFileList(),
                 "accept": self.locateFile
                 }
+
         if recall == True:
             kwargs["arguments"]["--recall"] = []
 
@@ -1929,10 +1960,8 @@ class GitDiffExplManager(GitExplManager):
             # 'M      runtime/syntax/nix.vim'
             file_name1 = line.split()[-1]
 
-        if "commit_id" in self._arguments and "parent" in self._arguments:
-            return file_name2 if file_name2 else file_name1
-
-        return self._getExplorer().getSourceInfo()[(file_name1, file_name2)]
+        return self._getExplorer().getSourceInfo().get((file_name1, file_name2),
+                                                       ("", "", "", file_name1, file_name2))
 
     def _createPreviewWindow(self, config, source, line_num, jump_cmd):
         self._preview_panel.create(self.createGitCommand(self._arguments, source), config)
@@ -1970,7 +1999,7 @@ class GitDiffExplManager(GitExplManager):
                   .format(id(self)))
 
             page = ExplorerPage(self._project_root, "")
-            page.create(arguments_dict, GitLogExplCommand(arguments_dict, ""))
+            page.create(arguments_dict, GitDiffExplCommand(arguments_dict, ""))
             self._pages.add(page)
         else:
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)
@@ -2020,7 +2049,7 @@ class GitDiffExplManager(GitExplManager):
         if "-s" in self._arguments:
             self._diff_view_panel.create(self._arguments, source, **kwargs)
         elif "accept" in self._arguments:
-            self._arguments["accept"](source)
+            self._arguments["accept"](lfGetFilePath(source))
         else:
             if kwargs.get("mode", '') == 't' and source not in self._result_panel.getSources():
                 lfCmd("tabnew")
@@ -2035,6 +2064,12 @@ class GitDiffExplManager(GitExplManager):
 
     def cleanup(self):
         self._diff_view_panel.cleanup()
+
+    def cleanupExplorerPage(self):
+        for page in self._pages:
+            if page.tabpage not in vim.tabpages:
+                self._pages.discard(page)
+                return
 
 
 class GitLogExplManager(GitExplManager):
@@ -2149,7 +2184,7 @@ class GitLogExplManager(GitExplManager):
             if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
                 tabmove()
 
-    def cleanup(self):
+    def cleanupExplorerPage(self):
         for k, v in self._pages.items():
             if v.tabpage not in vim.tabpages:
                 del self._pages[k]
