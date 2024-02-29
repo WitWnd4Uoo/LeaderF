@@ -185,22 +185,6 @@ class GitDiffCommand(GitCommand):
         super(GitDiffCommand, self).__init__(arguments_dict, source)
 
     def buildCommandAndBufferName(self):
-        # fuzzy search in navigation panel
-        if "commit_id" in self._arguments and "parent" in self._arguments:
-            if not self._arguments["parent"].startswith("0000000"):
-                self._cmd = "git diff --no-color {}..{} -- {}".format(self._arguments["parent"],
-                                                                      self._arguments["commit_id"],
-                                                                      lfGetFilePath(self._source)
-                                                                      )
-            else:
-                self._cmd = "git show --pretty= --no-color {} -- {}".format(self._arguments["commit_id"],
-                                                                            lfGetFilePath(self._source)
-                                                                            )
-            self._buffer_name = "LeaderF://" + self._cmd
-            self._file_type = "diff"
-            self._file_type_cmd = "silent! doautocmd filetypedetect BufNewFile *.diff"
-            return
-
         self._cmd = "git diff --no-color"
         extra_options = ""
         if "--cached" in self._arguments:
@@ -222,6 +206,26 @@ class GitDiffCommand(GitCommand):
 
         self._cmd += extra_options
         self._buffer_name = "LeaderF://git diff" + extra_options
+        self._file_type = "diff"
+        self._file_type_cmd = "silent! doautocmd filetypedetect BufNewFile *.diff"
+
+
+class GitLogDiffCommand(GitCommand):
+    def __init__(self, arguments_dict, source):
+        super(GitLogDiffCommand, self).__init__(arguments_dict, source)
+
+    def buildCommandAndBufferName(self):
+        # fuzzy search in navigation panel
+        if not self._arguments["parent"].startswith("0000000"):
+            self._cmd = "git diff --no-color {}..{} -- {}".format(self._arguments["parent"],
+                                                                  self._arguments["commit_id"],
+                                                                  lfGetFilePath(self._source)
+                                                                  )
+        else:
+            self._cmd = "git show --pretty= --no-color {} -- {}".format(self._arguments["commit_id"],
+                                                                        lfGetFilePath(self._source)
+                                                                        )
+        self._buffer_name = "LeaderF://" + self._cmd
         self._file_type = "diff"
         self._file_type_cmd = "silent! doautocmd filetypedetect BufNewFile *.diff"
 
@@ -1612,11 +1616,12 @@ class NavigationPanel(Panel):
 
 
 class ExplorerPage(object):
-    def __init__(self, project_root, commit_id):
+    def __init__(self, project_root, commit_id, owner):
         self._project_root = project_root
         self._navigation_panel = NavigationPanel(self.afterBufhidden)
         self._diff_view_panel = DiffViewPanel(self.afterBufhidden, commit_id)
         self._commit_id = commit_id
+        self._owner = owner
         self._arguments = {}
         self._win_pos = None
         self.tabpage = None
@@ -1731,6 +1736,7 @@ class ExplorerPage(object):
 
         kwargs = {}
         kwargs["arguments"] = {
+                "owner": self._owner,
                 "commit_id": self._commit_id,
                 "parent": self._navigation_panel.tree_view.getCurrentParent(),
                 "content": self._navigation_panel.tree_view.getFileList(),
@@ -1968,8 +1974,15 @@ class GitDiffExplManager(GitExplManager):
         self._preview_winid = self._preview_panel.getPreviewWinId()
         self._setWinOptions(self._preview_winid)
 
-    def createGitCommand(self, arguments_dict, source):
+    def getPreviewCommand(self, arguments_dict, source):
+        arguments_dict.update(self._arguments)
         return GitDiffCommand(arguments_dict, source)
+
+    def createGitCommand(self, arguments_dict, source):
+        if "owner" in arguments_dict:
+            return arguments_dict["owner"].getPreviewCommand(arguments_dict, source)
+        else:
+            return GitDiffCommand(arguments_dict, source)
 
     def _useExistingWindow(self, title, source, line_num, jump_cmd):
         self.setOptionsForCursor()
@@ -1998,7 +2011,7 @@ class GitDiffExplManager(GitExplManager):
             lfCmd("autocmd! Lf_Git TabClosed * call leaderf#Git#CleanupExplorerPage({})"
                   .format(id(self)))
 
-            page = ExplorerPage(self._project_root, "")
+            page = ExplorerPage(self._project_root, "", self)
             page.create(arguments_dict, GitDiffExplCommand(arguments_dict, ""))
             self._pages.add(page)
         else:
@@ -2099,6 +2112,9 @@ class GitLogExplManager(GitExplManager):
         self._preview_winid = self._preview_panel.getPreviewWinId()
         self._setWinOptions(self._preview_winid)
 
+    def getPreviewCommand(self, arguments_dict, source):
+        return GitLogDiffCommand(arguments_dict, source)
+
     def createGitCommand(self, arguments_dict, source):
         return GitLogCommand(arguments_dict, source)
 
@@ -2169,7 +2185,7 @@ class GitLogExplManager(GitExplManager):
                 lfCmd("autocmd! Lf_Git TabClosed * call leaderf#Git#CleanupExplorerPage({})"
                       .format(id(self)))
 
-                self._pages[source] = ExplorerPage(self._project_root, source)
+                self._pages[source] = ExplorerPage(self._project_root, source, self)
                 self._pages[source].create(self._arguments,
                                            GitLogExplCommand(self._arguments, source))
         else:
