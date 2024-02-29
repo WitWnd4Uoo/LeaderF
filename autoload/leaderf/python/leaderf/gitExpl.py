@@ -1292,6 +1292,11 @@ class TreeView(GitCommandView):
             else:
                 self._read_finished = 1
                 self._owner.readFinished(self)
+
+            # if content is empty, getFirstSource() will hang
+            if self._cur_parent is None:
+                self._first_source[self._cur_parent] = None
+                self._source_queue.put((None, None))
         except Exception:
             traceback.print_exc()
             traceback.print_stack()
