@@ -2023,8 +2023,9 @@ class GitDiffExplManager(GitExplManager):
             lfCmd("autocmd! Lf_Git TabClosed * call leaderf#Git#CleanupExplorerPage({})"
                   .format(id(self)))
 
-            page = ExplorerPage(self._project_root, "", self)
-            page.create(arguments_dict, GitDiffExplCommand(arguments_dict, ""))
+            uid = str(int(time.time()))[-7:]
+            page = ExplorerPage(self._project_root, uid, self)
+            page.create(arguments_dict, GitDiffExplCommand(arguments_dict, uid))
             self._pages.add(page)
         else:
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)
