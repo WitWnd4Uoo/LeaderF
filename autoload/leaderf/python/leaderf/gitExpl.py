@@ -131,10 +131,7 @@ class GitLogExplorer(GitExplorer):
 
         cmd = 'git log --pretty=format:"%h%d %s"'
         if "--current-file" in arguments_dict and "current_file" in arguments_dict:
-            file_name = arguments_dict["current_file"]
-            if " " in file_name:
-                file_name = file_name.replace(' ', r'\ ')
-            cmd += " -- {}".format(file_name)
+            cmd += " -- {}".format(arguments_dict["current_file"])
 
         if "extra" in arguments_dict:
             cmd += " " + " ".join(arguments_dict["extra"])
@@ -272,10 +269,7 @@ class GitLogCommand(GitCommand):
                 self._cmd += " " + " ".join(self._arguments["extra"])
 
             if "--current-file" in self._arguments and "current_file" in self._arguments:
-                file_name = self._arguments["current_file"]
-                if " " in file_name:
-                    file_name = file_name.replace(' ', r'\ ')
-                self._cmd += " -- {}".format(lfRelpath(file_name))
+                self._cmd += " -- {}".format(self._arguments["current_file"])
 
             self._buffer_name = "LeaderF://" + self._cmd
         else:
@@ -289,10 +283,7 @@ class GitLogCommand(GitCommand):
                 file_name = self._arguments["current_file"]
                 self._cmd += " -- {}".format(lfRelpath(file_name))
             elif "--current-file" in self._arguments and "current_file" in self._arguments:
-                file_name = self._arguments["current_file"]
-                if " " in file_name:
-                    file_name = file_name.replace(' ', r'\ ')
-                self._cmd += " -- {}".format(lfRelpath(file_name))
+                self._cmd += " -- {}".format(self._arguments["current_file"])
 
             self._buffer_name = "LeaderF://" + self._source
 
