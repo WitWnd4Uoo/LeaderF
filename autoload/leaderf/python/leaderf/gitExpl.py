@@ -363,7 +363,7 @@ class ParallelExecutor(object):
         executors = [AsyncExecutor() for _ in range(len(cmds))]
         workers = []
         for i, (exe, cmd) in enumerate(zip(executors, cmds)):
-            content = exe.execute(cmd.getCommand(), encoding=lfEval("&encoding"))
+            content = exe.execute(cmd, encoding=lfEval("&encoding"))
             worker = threading.Thread(target=readContent, args=(content, outputs[i]))
             worker.daemon = True
             worker.start()
@@ -767,7 +767,8 @@ class TreeView(GitCommandView):
     def getFileList(self):
         return self._file_list[self._cur_parent]
 
-    def generateSource(self, line):
+    @staticmethod
+    def generateSource(line):
         """
         :000000 100644 000000000 5b01d33aa A    runtime/syntax/json5.vim
         :100644 100644 671b269c0 ef52cddf4 M    runtime/syntax/nix.vim
@@ -884,7 +885,7 @@ class TreeView(GitCommandView):
                 self._file_list[parent] = []
 
             parent, tree_node = self._trees.last_key_value()
-            mode, source = self.generateSource(line)
+            mode, source = TreeView.generateSource(line)
             file_path = lfGetFilePath(source)
             self._file_list[parent].append("{:<4} {}{}"
                                            .format(source[2], source[3],
@@ -1570,7 +1571,7 @@ class DiffViewPanel(Panel):
             outputs = [None, None]
             if (cat_file_cmds[0].getBufferName() not in self._hidden_views
                 and cat_file_cmds[1].getBufferName() not in self._hidden_views):
-                outputs = ParallelExecutor.run(*cat_file_cmds)
+                outputs = ParallelExecutor.run(*[cmd.getCommand() for cmd in cat_file_cmds])
 
             if vim.current.tabpage not in self._buffer_names:
                 self._buffer_names[vim.current.tabpage] = [None, None]
@@ -2114,6 +2115,7 @@ class GitLogExplManager(GitExplManager):
         super(GitLogExplManager, self).__init__()
         lfCmd("augroup Lf_Git | augroup END")
         lfCmd("autocmd! Lf_Git FileType git call leaderf#Git#DefineSyntax()")
+        self._diff_view_panel = None
         # key is source, value is ExplorerPage
         self._pages = {}
 
@@ -2121,6 +2123,10 @@ class GitLogExplManager(GitExplManager):
         if self._explorer is None:
             self._explorer = GitLogExplorer()
         return self._explorer
+
+    def afterBufhidden(self):
+        if self._diff_view_panel.isAllHidden():
+            lfCmd("call timer_start(1, function('leaderf#Git#Cleanup', [{}]))".format(id(self)))
 
     def getSource(self, line):
         """
@@ -2165,7 +2171,7 @@ class GitLogExplManager(GitExplManager):
                 file_name = vim.current.buffer.name
                 if " " in file_name:
                     file_name = file_name.replace(' ', r'\ ')
-                self._arguments["current_file"] = file_name
+                self._arguments["current_file"] = lfRelpath(file_name)
 
         if "--recall" in arguments_dict:
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)
@@ -2201,7 +2207,17 @@ class GitLogExplManager(GitExplManager):
         line = args[0]
         source = self.getSource(line)
 
-        if "--explorer" in self._arguments:
+        if "--current-file" in self._arguments and "current_file" in self._arguments:
+            if self._diff_view_panel is None:
+                self._diff_view_panel = DiffViewPanel(self.afterBufhidden)
+
+            cmd = "git show --pretty= --no-color --raw {} -- {}".format(source,
+                                                                        self._arguments["current_file"])
+            outputs = ParallelExecutor.run(cmd)
+            if len(outputs[0]) > 0:
+                _, source = TreeView.generateSource(outputs[0][0])
+                self._diff_view_panel.create(self._arguments, source, **kwargs)
+        elif "--explorer" in self._arguments:
             if source in self._pages:
                 vim.current.tabpage = self._pages[source].tabpage
             else:
@@ -2223,6 +2239,10 @@ class GitLogExplManager(GitExplManager):
 
             if kwargs.get("mode", '') == 't' and len(vim.tabpages) > tabpage_count:
                 tabmove()
+
+    def cleanup(self):
+        if self._diff_view_panel is not None:
+            self._diff_view_panel.cleanup()
 
     def cleanupExplorerPage(self):
         for k, v in self._pages.items():
