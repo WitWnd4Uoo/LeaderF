@@ -196,10 +196,7 @@ class GitDiffCommand(GitCommand):
                 file_name = file_name.replace(' ', r'\ ')
             extra_options += " -- {}".format(file_name)
         elif "--current-file" in self._arguments and "current_file" in self._arguments:
-            file_name = self._arguments["current_file"]
-            if " " in file_name:
-                file_name = file_name.replace(' ', r'\ ')
-            extra_options += " -- {}".format(lfRelpath(file_name))
+            extra_options += " -- {}".format(self._arguments["current_file"])
 
         self._cmd += extra_options
         self._buffer_name = "LeaderF://git diff" + extra_options
@@ -280,8 +277,7 @@ class GitLogCommand(GitCommand):
                          ).format(self._source, sep)
 
             if "--recall" in self._arguments and "current_file" in self._arguments:
-                file_name = self._arguments["current_file"]
-                self._cmd += " -- {}".format(lfRelpath(file_name))
+                self._cmd += " -- {}".format(self._arguments["current_file"])
             elif "--current-file" in self._arguments and "current_file" in self._arguments:
                 self._cmd += " -- {}".format(self._arguments["current_file"])
 
@@ -306,12 +302,6 @@ class GitDiffExplCommand(GitCommand):
 
         self._cmd += extra_options
 
-        # if "--current-file" in self._arguments and "current_file" in self._arguments:
-        #     file_name = self._arguments["current_file"]
-        #     if " " in file_name:
-        #         file_name = file_name.replace(' ', r'\ ')
-        #     self._cmd += " -- {}".format(lfRelpath(file_name))
-
         self._buffer_name = "LeaderF://navigation/" + self._source
         self._file_type_cmd = ""
 
@@ -323,12 +313,6 @@ class GitLogExplCommand(GitCommand):
     def buildCommandAndBufferName(self):
         self._cmd = ('git show -m --raw -C --numstat --shortstat '
                      '--pretty=format:"# %P" --no-abbrev {}').format(self._source)
-
-        if "--current-file" in self._arguments and "current_file" in self._arguments:
-            file_name = self._arguments["current_file"]
-            if " " in file_name:
-                file_name = file_name.replace(' ', r'\ ')
-            self._cmd += " -- {}".format(lfRelpath(file_name))
 
         self._buffer_name = "LeaderF://navigation/" + self._source
         self._file_type_cmd = ""
@@ -1445,6 +1429,9 @@ class DiffViewPanel(Panel):
         self._buffer_names = {}
         self._bufhidden_cb = bufhidden_callback
 
+    def setCommitId(self, commit_id):
+        self._commit_id = commit_id
+
     def register(self, view):
         self._views[view.getBufferName()] = view
 
@@ -2202,6 +2189,7 @@ class GitLogExplManager(GitExplManager):
             if self._diff_view_panel is None:
                 self._diff_view_panel = DiffViewPanel(self.afterBufhidden)
 
+            self._diff_view_panel.setCommitId(source)
             cmd = "git show --pretty= --no-color --raw {} -- {}".format(source,
                                                                         self._arguments["current_file"])
             outputs = ParallelExecutor.run(cmd)
