@@ -1580,7 +1580,14 @@ class DiffViewPanel(Panel):
                     and int(lfEval("bufnr('{}')".format(escQuote(cmd.getBufferName())))) != -1):
                     lfCmd("call win_execute({}, 'setlocal bufhidden=wipe')".format(winid))
 
-                lfCmd("call win_execute({}, 'hide edit {}')".format(winid, cmd.getBufferName()))
+                buffer_name = lfEval("bufname(winbufnr({}))".format(winid))
+                lfCmd("call win_execute({}, 'diffoff | hide edit {}')".format(winid, cmd.getBufferName()))
+
+                # if the buffer also in another tabpage, BufHidden is not triggerd
+                # should run this code
+                if buffer_name in self._views and buffer_name not in self._hidden_views:
+                    self.bufHidden(self._views[buffer_name])
+
                 self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
                 if cmd.getBufferName() in self._hidden_views:
                     self.bufShown(cmd.getBufferName(), winid)
