@@ -1710,6 +1710,7 @@ class ExplorerPage(object):
         source = self._navigation_panel.getFirstSource()
         if source is not None:
             self._diff_view_panel.create(arguments_dict, source, winid=diff_view_winid)
+            lfCmd("call win_gotoid({})".format(self._navigation_panel.getWindowId()))
 
     def afterBufhidden(self):
         if self._navigation_panel.isHidden() and self._diff_view_panel.isAllHidden():
