@@ -1585,7 +1585,7 @@ class DiffViewPanel(Panel):
 
                 # if the buffer also in another tabpage, BufHidden is not triggerd
                 # should run this code
-                if buffer_name in self._views and buffer_name not in self._hidden_views:
+                if buffer_name in self._views:
                     self.bufHidden(self._views[buffer_name])
 
                 self._buffer_names[vim.current.tabpage][i] = cmd.getBufferName()
