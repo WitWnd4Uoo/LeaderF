@@ -170,17 +170,22 @@ function! leaderf#Git#Commands()
     if !exists("g:Lf_GitCommands")
         let g:Lf_GitCommands = [
                     \ {"Leaderf git diff":                         "fuzzy search and view the diffs"},
-                    \ {"Leaderf git diff --cached":                "fuzzy search and view `git diff --cached`"},
-                    \ {"Leaderf git diff HEAD":                    "fuzzy search and view `git diff HEAD`"},
                     \ {"Leaderf git diff --side-by-side":          "fuzzy search and view the side-by-side diffs"},
+                    \ {"Leaderf git diff --directly":              "view the diffs directly"},
+                    \ {"Leaderf git diff --directly --position right":"view the diffs in the right split window"},
+                    \ {"Leaderf git diff --cached":                "fuzzy search and view `git diff --cached`"},
                     \ {"Leaderf git diff --cached --side-by-side": "fuzzy search and view the side-by-side diffs of `git diff --cached`"},
-                    \ {"Leaderf git diff HEAD --side-by-side":     "fuzzy search and view the side-by-side diffs of `git diff HEAD`"},
-                    \ {"Leaderf git diff --directly":              "view the diffs directly in the current window"},
-                    \ {"Leaderf git diff --cached --directly":     "view `git diff --cached` directly in the current window"},
-                    \ {"Leaderf git diff HEAD --directly":         "view `git diff HEAD` directly in the current window"},
-                    \ {"Leaderf git diff --directly --position right":          "view the diffs in the right split window"},
+                    \ {"Leaderf git diff --cached --directly":     "view `git diff --cached` directly"},
                     \ {"Leaderf git diff --cached --directly --position right": "view `git diff --cached` directly in the right split window"},
+                    \ {"Leaderf git diff HEAD":                    "fuzzy search and view `git diff HEAD`"},
+                    \ {"Leaderf git diff HEAD --side-by-side":     "fuzzy search and view the side-by-side diffs of `git diff HEAD`"},
+                    \ {"Leaderf git diff HEAD --directly":         "view `git diff HEAD` directly"},
                     \ {"Leaderf git diff HEAD --directly --position right":     "view `git diff HEAD` directly in the right split window"},
+                    \ {"Leaderf git log":                          "fuzzy search and view the log"},
+                    \ {"Leaderf git log --directly":               "view the logs directly"},
+                    \ {"Leaderf git log --explorer":               "fuzzy search and view the logs of in an explorer tabpage"},
+                    \ {"Leaderf git log --current-file":           "fuzzy search and view the logs of current file"},
+                    \ {"Leaderf git log --explorer --navigation-position bottom": "specify the position of navigation panel in explorer tabpage"},
                     \ ]
     endif
 
