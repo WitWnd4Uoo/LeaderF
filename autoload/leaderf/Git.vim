@@ -121,7 +121,7 @@ let s:help = [
             \]
 
 function s:HelpFilter(winid, key)
-    if a:key == "\<ESC>"
+    if a:key == "\<ESC>" || a:key == "\<F1>"
         call popup_close(a:winid)
         return 1
     endif
