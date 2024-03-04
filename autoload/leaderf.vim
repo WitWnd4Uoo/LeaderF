@@ -71,7 +71,7 @@ function! s:InitDict(var, dict)
 endfunction
 
 call s:InitVar('g:Lf_WindowHeight', '0.5')
-call s:InitVar('g:Lf_TabpagePosition', 2)
+call s:InitVar('g:Lf_TabpagePosition', 3)
 call s:InitVar('g:Lf_ShowRelativePath', 1)
 call s:InitVar('g:Lf_DefaultMode', 'FullPath')
 call s:InitVar('g:Lf_CursorBlink', 1)
