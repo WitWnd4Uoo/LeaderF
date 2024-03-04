@@ -104,9 +104,7 @@ endfunction
 function! leaderf#Git#TreeViewMaps(id)
     exec g:Lf_py "import ctypes"
     let tree_view = printf("ctypes.cast(%d, ctypes.py_object).value", a:id)
-    exec printf('nnoremap <silent> <C-G>     :exec g:Lf_py "%s.locateFile(''aa'')"<CR>', tree_view)
     exec printf('nnoremap <silent> X         :exec g:Lf_py "%s.collapseChildren()"<CR>', tree_view)
-    exec printf('command! -bar LeaderfGitFind exec g:Lf_py "%s.locateFile(''aa'')"', tree_view)
     nnoremap <buffer> <silent> -             :call leaderf#Git#OuterIndent(0)<CR>
     nnoremap <buffer> <silent> +             :call leaderf#Git#OuterIndent(1)<CR>
     nnoremap <buffer> <silent> <C-K>         :call leaderf#Git#SameIndent(0)<CR>
