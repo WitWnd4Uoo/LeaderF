@@ -1992,6 +1992,59 @@ class GitDiffExplManager(GitExplManager):
         else:
             self._preview_panel.setContent(content)
 
+    def vsplitDiff(self):
+        if "--cached" not in self._arguments:
+            if "extra" in self._arguments:
+                cmd = "git diff {} --raw -- {}".format(" ".join(self._arguments["extra"]),
+                                                 self._arguments["current_file"])
+
+                outputs = ParallelExecutor.run(cmd)
+                if len(outputs[0]) == 0:
+                    lfPrintError("No diffs!")
+                    return
+
+                blob = outputs[0][0].split()[2]
+                cmd = "git cat-file -p {}".format(blob)
+                file_name = "LeaderF://{}:{}".format(blob, self._arguments["current_file"])
+            else:
+                cmd = "git show :{}".format(self._arguments["current_file"])
+                file_name = "LeaderF://:{}".format(self._arguments["current_file"])
+
+            win_ids = [int(lfEval("win_getid()")), 0]
+            lfCmd("keepa keepj abo vsp {}".format(file_name))
+            win_ids[1] = int(lfEval("win_getid()"))
+            lfCmd("augroup Lf_Git | augroup END")
+            lfCmd("autocmd! Lf_Git BufWipeout <buffer> call leaderf#Git#DiffOff({})".format(win_ids))
+            lfCmd("call win_execute({}, 'autocmd! Lf_Git BufHidden,BufWipeout <buffer> call leaderf#Git#DiffOff({})')"
+                  .format(win_ids[0], win_ids))
+            lfCmd("setlocal nobuflisted")
+            lfCmd("setlocal buftype=nofile")
+            lfCmd("setlocal bufhidden=wipe")
+            lfCmd("setlocal undolevels=-1")
+            lfCmd("setlocal noswapfile")
+            lfCmd("setlocal nospell")
+
+            outputs = ParallelExecutor.run(cmd)
+            vim.current.buffer[:] = outputs[0]
+            lfCmd("setlocal nomodifiable")
+
+            for winid in win_ids:
+                lfCmd("call win_execute({}, 'diffthis')".format(winid))
+        else:
+            if "extra" in self._arguments:
+                extra = " ".join(self._arguments["extra"])
+            else:
+                extra = ""
+
+            cmd = "git diff {} --cached --raw -- {}".format(extra,
+                                                            self._arguments["current_file"])
+            outputs = ParallelExecutor.run(cmd)
+            if len(outputs[0]) > 0:
+                _, source = TreeView.generateSource(outputs[0][0])
+                self._diff_view_panel.create(self._arguments, source, **{"mode": 't'})
+            else:
+                lfPrintError("No diffs!")
+
     def startExplorer(self, win_pos, *args, **kwargs):
         if self.checkWorkingDirectory() == False:
             return
@@ -1999,6 +2052,19 @@ class GitDiffExplManager(GitExplManager):
         arguments_dict = kwargs.get("arguments", {})
         if "--recall" not in arguments_dict:
             self.setArguments(arguments_dict)
+            if ("--current-file" in arguments_dict
+                and vim.current.buffer.name
+                and not vim.current.buffer.options['bt']
+               ):
+                file_name = vim.current.buffer.name
+                if " " in file_name:
+                    file_name = file_name.replace(' ', r'\ ')
+                self._arguments["current_file"] = lfRelpath(file_name)
+                if "-s" in self._arguments:
+                    self.vsplitDiff()
+                else:
+                    self._accept(self._arguments["current_file"], "")
+                return
 
         if "--recall" in arguments_dict:
             super(GitExplManager, self).startExplorer(win_pos, *args, **kwargs)

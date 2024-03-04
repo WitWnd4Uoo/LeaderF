@@ -171,6 +171,7 @@ function! leaderf#Git#Commands()
         let g:Lf_GitCommands = [
                     \ {"Leaderf git diff":                         "fuzzy search and view the diffs"},
                     \ {"Leaderf git diff --side-by-side":          "fuzzy search and view the side-by-side diffs"},
+                    \ {"Leaderf git diff --side-by-side --current-file":"view the side-by-side diffs of the current file"},
                     \ {"Leaderf git diff --directly":              "view the diffs directly"},
                     \ {"Leaderf git diff --directly --position right":"view the diffs in the right split window"},
                     \ {"Leaderf git diff --cached":                "fuzzy search and view `git diff --cached`"},
@@ -184,8 +185,8 @@ function! leaderf#Git#Commands()
                     \ {"Leaderf git log":                          "fuzzy search and view the log"},
                     \ {"Leaderf git log --directly":               "view the logs directly"},
                     \ {"Leaderf git log --explorer":               "fuzzy search and view the logs of in an explorer tabpage"},
-                    \ {"Leaderf git log --current-file":           "fuzzy search and view the logs of current file"},
                     \ {"Leaderf git log --explorer --navigation-position bottom": "specify the position of navigation panel in explorer tabpage"},
+                    \ {"Leaderf git log --current-file":           "fuzzy search and view the logs of current file"},
                     \ ]
     endif
 
@@ -215,4 +216,10 @@ function! leaderf#Git#DefineSyntax() abort
     syn match Lf_hl_gitStatPlus /\%(^ \S*\%( => \S*\)\?\s*|\s*\d\+\s*\)\@<=+*\%(-*$\)\@=/ display containedin=Lf_hl_gitStat contained
     syn match Lf_hl_gitStatMinus /\%(^ \S*\%( => \S*\)\?\s*|\s*\d\+\s*+*\)\@<=-*$/ display containedin=Lf_hl_gitStat contained
     syn match gitIdentityHeader /^Committer:/ contained containedin=gitHead nextgroup=gitIdentity skipwhite contains=@NoSpell
+endfunction
+
+function! leaderf#Git#DiffOff(win_ids) abort
+    for id in a:win_ids
+        call win_execute(id, "diffoff")
+    endfor
 endfunction
