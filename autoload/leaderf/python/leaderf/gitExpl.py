@@ -652,7 +652,7 @@ class TreeView(GitCommandView):
         self._add_icon = lfEval("get(g:, 'Lf_GitAddIcon', '')")    #  
         self._copy_icon = lfEval("get(g:, 'Lf_GitCopyIcon', '')")
         self._del_icon = lfEval("get(g:, 'Lf_GitDelIcon', '')")    #  
-        self._modification_icon = lfEval("get(g:, 'Lf_GitModificationIcon', '')")
+        self._modification_icon = lfEval("get(g:, 'Lf_GitModifyIcon', '')")
         self._rename_icon = lfEval("get(g:, 'Lf_GitRenameIcon', '')")
         self._status_icons = {
                 "A": self._add_icon,

@@ -1138,6 +1138,39 @@ g:Lf_GitCommands                              *g:Lf_GitCommands*
 <
     Open the commands panel using `:Leaderf git` .
 
+g:Lf_GitFolderIcons                           *g:Lf_GitFolderIcons*
+   To customize the folder icons in tree panel.
+   Default value is { 'open': '', 'closed': '' }.
+
+g:Lf_GitAddIcon                               *g:Lf_GitAddIcon*
+   To customize the icon of added file in tree panel.
+   Default value is ''.
+
+g:Lf_GitCopyIcon                              *g:Lf_GitCopyIcon*
+   To customize the icon of copied file in tree panel.
+   Default value is ''.
+
+g:Lf_GitDelIcon                               *g:Lf_GitDelIcon*
+   To customize the icon of deleted file in tree panel.
+   Default value is ''.
+
+g:Lf_GitModifyIcon                            *g:Lf_GitModifyIcon*
+   To customize the icon of modified file in tree panel.
+   Default value is ''.
+
+g:Lf_GitRenameIcon                            *g:Lf_GitRenameIcon*
+   To customize the icon of renamed file in tree panel.
+   Default value is ''.
+
+g:Lf_GitNavigationPanelHeight                 *g:Lf_GitNavigationPanelHeight*
+   To customize the height of navigation(tree) panel.
+   Default value is &lines * 0.3.
+
+g:Lf_GitNavigationPanelWidth                  *g:Lf_GitNavigationPanelWidth*
+   To customize the width of navigation(tree) panel.
+   Default value is &columns * 0.2.
+
+
 ==============================================================================
 USAGE                                           *leaderf-usage*
 
