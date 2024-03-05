@@ -128,8 +128,54 @@ function s:HelpFilter(winid, key)
     return 1
 endfunction
 
+function! s:GetRowCol(width, height)
+    let win_width = &columns
+    let win_height = &lines
+
+    let row = (win_height - a:height) / 2 - 1
+    let col = (win_width - a:width) / 2
+
+    return {'row': row, 'col': col}
+endfunction
+
 function! leaderf#Git#ShowHelp()
     if has("nvim")
+        let borderchars = [
+                    \ [g:Lf_PopupBorders[4],  "Lf_hl_popupBorder"],
+                    \ [g:Lf_PopupBorders[0],  "Lf_hl_popupBorder"],
+                    \ [g:Lf_PopupBorders[5],  "Lf_hl_popupBorder"],
+                    \ [g:Lf_PopupBorders[1],  "Lf_hl_popupBorder"],
+                    \ [g:Lf_PopupBorders[6],  "Lf_hl_popupBorder"],
+                    \ [g:Lf_PopupBorders[2],  "Lf_hl_popupBorder"],
+                    \ [g:Lf_PopupBorders[7],  "Lf_hl_popupBorder"],
+                    \ [g:Lf_PopupBorders[3],  "Lf_hl_popupBorder"]
+                    \]
+        let width = 100
+        let height = len(s:help)
+        let row_col = s:GetRowCol(width, height)
+        let options = {
+                    \ "title":           " Help ",
+                    \ "title_pos":       "center",
+                    \ "relative":        "editor",
+                    \ "row":             row_col["row"],
+                    \ "col":             row_col["col"],
+                    \ "width":           width,
+                    \ "height":          height,
+                    \ "zindex":          20482,
+                    \ "noautocmd":       1,
+                    \ "border":          borderchars,
+                    \ "style":           "minimal",
+                    \}
+        let scratch_buffer = nvim_create_buf(v:false, v:true)
+        call nvim_buf_set_option(scratch_buffer, 'bufhidden', 'wipe')
+        call nvim_buf_set_lines(scratch_buffer, 0, -1, v:false, s:help)
+        call nvim_buf_set_option(scratch_buffer, 'modifiable', v:false)
+        let id = nvim_open_win(scratch_buffer, 1, options)
+        call nvim_win_set_option(id, 'winhighlight', 'Normal:Lf_hl_popup_window')
+        call win_execute(id, 'call matchadd("Special", ''^.\{-}\(:\)\@='')')
+        call win_execute(id, 'call matchadd("Comment", ''\(^.\{-}:\s*\)\@<=.*'')')
+        call win_execute(id, 'nnoremap <buffer> <silent> <ESC> <C-W>c')
+        call win_execute(id, 'nnoremap <buffer> <silent> <F1> <C-W>c')
     else
         let options = {
                     \ "title":           " Help ",
@@ -145,7 +191,8 @@ function! leaderf#Git#ShowHelp()
 
         let id = popup_create(s:help, options)
         call win_execute(id, 'setlocal wincolor=Lf_hl_popup_window')
-        call win_execute(id, "call matchadd('Special', '^.\\{-}:')")
+        call win_execute(id, 'call matchadd("Special", ''^.\{-}\(:\)\@='')')
+        call win_execute(id, 'call matchadd("Comment", ''\(^.\{-}:\s*\)\@<=.*'')')
     endif
 endfunction
 
