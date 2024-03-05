@@ -1186,9 +1186,13 @@ class TreeView(GitCommandView):
         super(TreeView, self).setOptions(winid, bufhidden)
         lfCmd(r"""call win_execute({}, 'let &l:stl="%#Lf_hl_gitStlChangedNum# 0 %#Lf_hl_gitStlFileChanged#file changed, %#Lf_hl_gitStlAdd#0 (+), %#Lf_hl_gitStlDel#0 (-)"')"""
               .format(winid))
-        lfCmd("call win_execute({}, 'setlocal cursorline')".format(winid))
-        lfCmd("call win_execute({}, 'setlocal nonumber')".format(winid))
-        lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=8')".format(winid))
+        if lfEval("has('nvim')") == '1':
+            lfCmd("call nvim_win_set_option(%d, 'cursorline', v:true)" % winid)
+            lfCmd("call nvim_win_set_option(%d, 'number', v:false)" % winid)
+        else:
+            lfCmd("call win_execute({}, 'setlocal cursorline')".format(winid))
+            lfCmd("call win_execute({}, 'setlocal nonumber')".format(winid))
+        lfCmd("call win_execute({}, 'noautocmd setlocal sw=2 tabstop=4')".format(winid))
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(winid))
         lfCmd("call win_execute({}, 'setlocal foldmethod=indent')".format(winid))
         lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(winid))
